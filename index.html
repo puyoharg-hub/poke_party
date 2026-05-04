@@ -1,0 +1,2031 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>タイプ補完チェッカー — M-A</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  :root {
+    --bg:      #0f1117;
+    --bg2:     #161b27;
+    --bg3:     #1e2535;
+    --border:  #2a3248;
+    --text:    #e2e8f0;
+    --muted:   #64748b;
+    --accent:  #6366f1;
+    --accent2: #818cf8;
+    --green:   #22c55e;
+    --amber:   #f59e0b;
+    --red:     #ef4444;
+    --teal:    #14b8a6;
+    --footer-h: clamp(148px, 22vh, 260px);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding-bottom: calc(var(--footer-h) + 1rem);
+  }
+
+  /* ===== HEADER ===== */
+  header {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  .header-left { display: flex; align-items: baseline; gap: .875rem; }
+  header h1 { font-size: 1rem; font-weight: 700; letter-spacing: .05em; color: var(--accent2); }
+  header .subtitle { font-size: .7rem; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+  /* ハンバーガー */
+  .hamburger {
+    width: 36px; height: 36px;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: none; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    transition: border-color .15s;
+    flex-shrink: 0;
+  }
+  .hamburger:hover { border-color: var(--accent); }
+  .hamburger span {
+    display: block; width: 14px; height: 1.5px;
+    background: var(--muted); border-radius: 2px; transition: background .15s;
+  }
+  .hamburger:hover span { background: var(--accent2); }
+  .hamburger .exclude-badge {
+    position: absolute; top: 8px; right: 8px;
+    background: var(--red); color: #fff;
+    font-size: .55rem; font-family: 'JetBrains Mono', monospace;
+    width: 14px; height: 14px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    display: none;
+  }
+  .hamburger { position: relative; }
+
+  /* ===== MODAL（除外設定） ===== */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: #00000088;
+    z-index: 200;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    width: min(540px, 95vw);
+    max-height: 80vh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 24px 64px #000000aa;
+  }
+  .modal-header {
+    padding: 1.125rem 1.25rem .875rem;
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+    flex-shrink: 0;
+  }
+  .modal-title { font-size: .95rem; font-weight: 700; }
+  .modal-close {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 1.125rem; line-height: 1; padding: .25rem; transition: color .15s;
+  }
+  .modal-close:hover { color: var(--red); }
+  .modal-body { padding: 1.125rem 1.25rem; overflow-y: auto; flex: 1; }
+  .modal-desc { font-size: .8rem; color: var(--muted); margin-bottom: .875rem; line-height: 1.6; }
+  .modal-footer {
+    padding: .75rem 1.25rem;
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: .75rem;
+    flex-shrink: 0;
+  }
+  .exclude-count { font-size: .75rem; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+  .exclude-count.active { color: var(--red); }
+  .text-btn {
+    font-size: .75rem; color: var(--muted); background: none; border: none;
+    cursor: pointer; transition: color .12s; padding: 0;
+  }
+  .text-btn:hover { color: var(--red); }
+  .search-input-full {
+    width: 100%; background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 7px; color: var(--text); font-family: 'Noto Sans JP', sans-serif;
+    font-size: .875rem; padding: .5rem .75rem; outline: none; margin-bottom: .75rem;
+    transition: border-color .15s;
+  }
+  .search-input-full:focus { border-color: var(--accent); }
+  .exclude-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+    gap: .4rem;
+  }
+  .exclude-chip {
+    display: flex; flex-direction: column; align-items: center;
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 8px; padding: .3rem .2rem .25rem;
+    cursor: pointer; transition: all .12s; user-select: none;
+    position: relative; overflow: hidden;
+  }
+  .exclude-chip:hover { border-color: #ef444466; }
+  .exclude-chip.excluded { background: #7f1d1d55; border-color: #ef444488; }
+  .exclude-chip.excluded::after {
+    content: '✕';
+    position: absolute; inset: 0;
+    background: #7f1d1d99;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .9rem; color: #fca5a5;
+    border-radius: 7px;
+  }
+  .exclude-chip img {
+    width: 40px; height: 40px;
+    image-rendering: pixelated;
+  }
+
+  /* ===== CONTAINER ===== */
+  .container { max-width: 1100px; margin: 0 auto; padding: 1.75rem 2rem; }
+
+  /* ===== PAGE TABS ===== */
+  .page-tabs {
+    display: flex; gap: .25rem;
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 10px; padding: .25rem;
+    width: fit-content; margin-bottom: 1.75rem;
+  }
+  .page-tab {
+    padding: .45rem 1.25rem; border-radius: 7px; border: none;
+    background: none; color: var(--muted);
+    font-family: 'Noto Sans JP', sans-serif; font-size: .875rem; font-weight: 500;
+    cursor: pointer; transition: all .15s;
+  }
+  .page-tab.active { background: var(--accent); color: #fff; }
+  .page-tab:not(.active):hover { color: var(--text); }
+
+  /* tab切り替えはdisplay:noneではなくvisibilityで状態保持 */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ===== MODE TABS ===== */
+  .tabs {
+    display: flex; gap: .25rem;
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 10px; padding: .25rem;
+    width: fit-content; margin-bottom: 1.75rem;
+  }
+  .tab {
+    padding: .45rem 1.5rem; border-radius: 7px; border: none;
+    background: none; color: var(--muted);
+    font-family: 'Noto Sans JP', sans-serif; font-size: .875rem; font-weight: 500;
+    cursor: pointer; transition: all .15s;
+  }
+  .tab.active { background: var(--accent); color: #fff; }
+  .tab:not(.active):hover { color: var(--text); }
+
+  /* ===== CONTROLS ===== */
+  .controls {
+    display: grid; grid-template-columns: 1fr auto;
+    gap: 1rem; margin-bottom: 1.5rem; align-items: end;
+  }
+  .control-group label {
+    display: block; font-size: .75rem; color: var(--muted);
+    margin-bottom: .4rem; font-weight: 500;
+    letter-spacing: .04em; text-transform: uppercase;
+  }
+  .pin-area { display: flex; flex-direction: column; gap: .5rem; }
+  .pin-row  { display: flex; gap: .5rem; align-items: center; }
+
+  /* ===== SEARCH WIDGET ===== */
+  .search-wrap { position: relative; flex: 1; }
+  .pin-input {
+    width: 100%; background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 7px; color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif; font-size: .875rem;
+    padding: .5rem .75rem; outline: none; transition: border-color .15s;
+  }
+  .pin-input:focus { border-color: var(--accent); }
+  .pin-input.selected { border-color: var(--accent); background: var(--bg3); }
+  .search-dropdown {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: var(--bg3); border: 1px solid var(--accent);
+    border-radius: 7px; max-height: 220px; overflow-y: auto;
+    z-index: 120; display: none;
+    box-shadow: 0 8px 24px #00000077;
+  }
+  .search-dropdown.show { display: block; }
+  .search-option {
+    padding: .4rem .75rem; font-size: .825rem; cursor: pointer;
+    transition: background .08s;
+    display: flex; justify-content: space-between; align-items: center; gap: .5rem;
+  }
+  .search-option:hover, .search-option.focused { background: var(--accent); color: #fff; }
+  .opt-meta { display: flex; gap: .5rem; align-items: center; flex-shrink: 0; }
+  .opt-types { font-size: .7rem; color: var(--muted); }
+  .search-option:hover .opt-types,
+  .search-option.focused .opt-types { color: #ffffffaa; }
+
+  .pin-clear {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 1rem; padding: .2rem; line-height: 1; transition: color .15s; flex-shrink: 0;
+  }
+  .pin-clear:hover { color: var(--red); }
+  .pin-badge {
+    font-size: .7rem; color: var(--muted); white-space: nowrap;
+    font-family: 'JetBrains Mono', monospace; flex-shrink: 0;
+  }
+
+  .run-btn {
+    padding: .55rem 2rem; background: var(--accent);
+    border: none; border-radius: 8px; color: #fff;
+    font-family: 'Noto Sans JP', sans-serif; font-size: .9rem; font-weight: 700;
+    cursor: pointer; transition: background .15s, transform .1s;
+    white-space: nowrap; align-self: end;
+  }
+  .run-btn:hover { background: var(--accent2); }
+  .run-btn:active { transform: scale(.97); }
+  .run-btn:disabled { background: var(--bg3); color: var(--muted); cursor: not-allowed; }
+
+  /* ===== PROGRESS ===== */
+  .progress-wrap { margin-bottom: 1rem; display: none; }
+  .progress-wrap.show { display: block; }
+  .progress-bar-bg { background: var(--bg3); border-radius: 4px; height: 4px; overflow: hidden; }
+  .progress-bar { height: 100%; background: var(--accent); border-radius: 4px; transition: width .2s; width: 0%; }
+  .progress-text { font-size: .75rem; color: var(--muted); margin-top: .35rem; font-family: 'JetBrains Mono', monospace; }
+
+  /* ===== COLLAPSIBLE PANELS ===== */
+  .collapsible-panel {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 10px; padding: .875rem 1.25rem; margin-bottom: 1.25rem;
+  }
+  .collapsible-header {
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer; user-select: none;
+  }
+  .collapsible-title {
+    font-size: .8rem; font-weight: 700; color: var(--muted);
+    letter-spacing: .05em; text-transform: uppercase;
+  }
+  .collapsible-title .hint {
+    font-family: 'JetBrains Mono', monospace; font-size: .7rem;
+    margin-left: .5rem; font-weight: 400; text-transform: none;
+  }
+  .hint-amber { color: var(--amber); }
+  .hint-teal  { color: var(--teal); }
+  .collapsible-toggle { color: var(--muted); font-size: .75rem; transition: transform .2s; }
+  .collapsible-toggle.open { transform: rotate(180deg); }
+  .collapsible-body { display: none; }
+  .type-btn-grid { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .875rem; }
+  .type-toggle-btn {
+    padding: .25rem .7rem; border-radius: 5px;
+    border: 1px solid var(--border); background: none; color: var(--muted);
+    font-size: .75rem; font-family: 'Noto Sans JP', sans-serif;
+    cursor: pointer; transition: all .12s;
+  }
+  .type-toggle-btn:hover { border-color: var(--accent); color: var(--text); }
+  .type-toggle-btn.active-amber { background: #78350f44; border-color: #f59e0b88; color: #fbbf24; }
+  .type-toggle-btn.active-teal  { background: #0f766e33; border-color: #14b8a688; color: var(--teal); }
+  .panel-clear-btn {
+    font-size: .7rem; color: var(--muted); background: none; border: none;
+    cursor: pointer; padding: .25rem .5rem; transition: color .12s; margin-top: .4rem;
+  }
+  .panel-clear-btn:hover { color: var(--red); }
+
+  /* ===== FILTER TABS ===== */
+  .filter-tabs {
+    display: flex; gap: .5rem; margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border); padding-bottom: .75rem; flex-wrap: wrap;
+  }
+  .filter-tab {
+    padding: .3rem 1rem; border-radius: 6px; border: 1px solid var(--border);
+    background: none; color: var(--muted); font-size: .8rem;
+    font-family: 'Noto Sans JP', sans-serif; cursor: pointer; transition: all .15s;
+  }
+  .filter-tab.active { background: var(--bg3); border-color: var(--accent); color: var(--accent2); }
+  .filter-tab .count { font-family: 'JetBrains Mono', monospace; font-size: .7rem; margin-left: .4rem; opacity: .7; }
+  .result-summary { font-size: .8rem; color: var(--muted); margin-bottom: 1rem; font-family: 'JetBrains Mono', monospace; }
+
+  /* ===== RESULT CARDS ===== */
+  .results-list { display: flex; flex-direction: column; gap: .5rem; }
+  .result-card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
+    padding: .875rem 1.25rem;
+    display: grid; grid-template-columns: 2.5rem 1fr auto;
+    gap: .75rem; align-items: start; transition: border-color .15s;
+  }
+  .result-card:hover { border-color: var(--accent); }
+  .card-rank { font-family: 'JetBrains Mono', monospace; font-size: .75rem; color: var(--muted); text-align: right; padding-top: .15rem; }
+  .card-body { min-width: 0; }
+  .card-members { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .5rem; align-items: center; }
+  .member-chip {
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 6px; padding: .2rem .65rem;
+    font-size: .825rem; font-weight: 500; color: var(--text);
+  }
+  .member-chip.pinned { border-color: var(--accent); color: var(--accent2); }
+  .sep { color: var(--muted); font-size: .9rem; }
+  .tag-row { display: flex; flex-wrap: wrap; gap: .3rem; }
+  .tag { font-size: .7rem; padding: .15rem .5rem; border-radius: 4px; font-weight: 500; }
+  .tag-cover { background: #14532d44; color: #4ade80; border: 1px solid #14532d; }
+  .tag-hole  { background: #78350f44; color: #fbbf24; border: 1px solid #78350f; }
+  .tag-hole.priority { background: #78350fcc; border-color: #f59e0b; box-shadow: 0 0 6px #f59e0b44; }
+  .card-stats { text-align: right; white-space: nowrap; }
+  .stat-cover { font-family: 'JetBrains Mono', monospace; font-size: .8rem; color: var(--teal); font-weight: 600; }
+  .stat-hole  { font-family: 'JetBrains Mono', monospace; font-size: .75rem; color: var(--amber); margin-top: .2rem; }
+  .stat-zero  { color: var(--green); }
+  .empty { text-align: center; padding: 3rem; color: var(--muted); font-size: .9rem; }
+
+  /* ===== CHECKER PAGE ===== */
+  .section-panel {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1.25rem; margin-bottom: 1.5rem;
+  }
+  .section-panel h2 { font-size: .95rem; font-weight: 700; margin-bottom: .3rem; }
+  .section-panel p  { font-size: .8rem; color: var(--muted); margin-bottom: 1rem; line-height: 1.6; }
+  .checker-slots { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .checker-slot { flex: 1; min-width: 200px; }
+  .checker-slot label {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: .7rem; color: var(--muted); margin-bottom: .35rem;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .slot-clear-btn {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: .8rem; padding: 0; transition: color .12s;
+  }
+  .slot-clear-btn:hover { color: var(--red); }
+  .checker-result {
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1rem 1.25rem;
+  }
+  .eff-section-title {
+    font-size: .7rem; font-weight: 700; letter-spacing: .05em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: .4rem;
+  }
+  .type-eff-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: .35rem;
+    margin-bottom: .875rem;
+  }
+  .type-eff-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 6px; padding: .3rem .6rem; font-size: .8rem;
+  }
+  .eff-type { font-weight: 500; }
+  .eff-val  { font-family: 'JetBrains Mono', monospace; font-size: .72rem; display: flex; gap: .25rem; }
+  .ev-immune { color: #4ade80; }
+  .ev-resist { color: var(--teal); }
+  .ev-normal { color: var(--muted); }
+  .ev-super  { color: #f87171; font-weight: 600; }
+
+  /* ===== PARTY FOOTER ===== */
+  .party-footer {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    z-index: 80;
+    display: flex; flex-direction: column; align-items: center;
+  }
+
+  /* ツールバー（セットタブ＋クリアボタン） */
+  .party-toolbar {
+    width: 100%; max-width: 1100px;
+    padding: .35rem 1.25rem .25rem;
+    display: flex; align-items: center; justify-content: space-between; gap: .5rem;
+  }
+  .set-tabs { display: flex; gap: .2rem; }
+  .set-tab {
+    padding: .25rem .75rem; border-radius: 5px;
+    border: 1px solid var(--border); background: none; color: var(--muted);
+    font-family: 'JetBrains Mono', monospace; font-size: .72rem;
+    cursor: pointer; transition: all .12s; white-space: nowrap;
+  }
+  .set-tab:hover { border-color: var(--accent); color: var(--text); }
+  .set-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .set-tab.has-data { color: var(--accent2); border-color: #6366f155; }
+  .set-tab.active.has-data { color: #fff; }
+  .party-clear-btn {
+    padding: .25rem .75rem; border-radius: 5px;
+    border: 1px solid var(--border); background: none; color: var(--muted);
+    font-size: .72rem; cursor: pointer; transition: all .12s; white-space: nowrap;
+    font-family: 'Noto Sans JP', sans-serif;
+  }
+  .party-clear-btn:hover { border-color: var(--red); color: var(--red); }
+
+  /* ===== ARCHIVE TOOLBAR ===== */
+  .archive-toolbar-right {
+    display: flex; align-items: center; gap: .4rem; flex-shrink: 0;
+  }
+  .archive-memo-input {
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 5px; color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif; font-size: .72rem;
+    padding: .25rem .6rem; outline: none; width: 200px;
+    transition: border-color .15s;
+  }
+  .archive-memo-input:focus { border-color: var(--accent); }
+  .archive-memo-input::placeholder { color: var(--muted); }
+  .archive-btn {
+    padding: .25rem .75rem; border-radius: 5px;
+    border: 1px solid #6366f155; background: none; color: var(--accent2);
+    font-size: .72rem; cursor: pointer; transition: all .12s; white-space: nowrap;
+    font-family: 'Noto Sans JP', sans-serif;
+  }
+  .archive-btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .archive-load-btn {
+    padding: .25rem .75rem; border-radius: 5px;
+    border: 1px solid var(--border); background: none; color: var(--muted);
+    font-size: .72rem; cursor: pointer; transition: all .12s; white-space: nowrap;
+    font-family: 'Noto Sans JP', sans-serif;
+  }
+  .archive-load-btn:hover { border-color: var(--teal); color: var(--teal); }
+
+  /* ===== ARCHIVE MODAL ===== */
+  .archive-overlay {
+    display: none; position: fixed; inset: 0;
+    background: #00000088; z-index: 200;
+    align-items: center; justify-content: center;
+  }
+  .archive-overlay.show { display: flex; }
+  .archive-modal {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 14px; width: min(700px, 95vw);
+    max-height: 80vh; display: flex; flex-direction: column;
+    box-shadow: 0 24px 64px #000000aa;
+  }
+  .archive-modal-header {
+    padding: 1rem 1.25rem .75rem;
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+    flex-shrink: 0;
+  }
+  .archive-modal-title { font-size: .95rem; font-weight: 700; }
+  .archive-modal-close {
+    background: none; border: none; color: var(--muted);
+    cursor: pointer; font-size: 1.125rem; padding: .25rem; transition: color .15s;
+  }
+  .archive-modal-close:hover { color: var(--red); }
+  .archive-modal-body { padding: .75rem 1.25rem; overflow-y: auto; flex: 1; }
+  .archive-empty { text-align: center; padding: 2.5rem; color: var(--muted); font-size: .875rem; }
+  .archive-entry {
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 10px; padding: .75rem 1rem; margin-bottom: .5rem;
+    transition: border-color .15s;
+  }
+  .archive-entry:hover { border-color: var(--accent); }
+  .archive-entry-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    margin-bottom: .5rem; gap: .5rem;
+  }
+  .archive-entry-date {
+    font-family: 'JetBrains Mono', monospace; font-size: .68rem; color: var(--muted);
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .archive-entry-actions { display: flex; gap: .35rem; flex-shrink: 0; }
+  .archive-action-btn {
+    padding: .15rem .5rem; border-radius: 4px;
+    border: 1px solid var(--border); background: none;
+    font-size: .68rem; cursor: pointer; transition: all .12s;
+    font-family: 'Noto Sans JP', sans-serif;
+  }
+  .archive-action-btn.load  { color: var(--teal);  border-color: #14b8a644; }
+  .archive-action-btn.load:hover  { background: #0f766e44; border-color: var(--teal); }
+  .archive-action-btn.del   { color: var(--muted); }
+  .archive-action-btn.del:hover   { color: var(--red); border-color: #ef444466; }
+  .archive-entry-members {
+    display: flex; flex-wrap: wrap; gap: .3rem; margin-bottom: .4rem;
+  }
+  .archive-member-chip {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 5px; padding: .15rem .5rem;
+    font-size: .75rem; color: var(--text);
+    display: flex; align-items: center; gap: .3rem;
+  }
+  .archive-member-chip img {
+    width: 24px; height: 24px; image-rendering: pixelated;
+  }
+  .archive-entry-memo {
+    font-size: .78rem; color: var(--muted); line-height: 1.5;
+    white-space: pre-wrap; word-break: break-all;
+    border-top: 1px solid var(--border); padding-top: .4rem; margin-top: .1rem;
+  }
+  .archive-entry-memo:empty { display: none; }
+  .archive-modal-footer {
+    padding: .6rem 1.25rem; border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: .75rem; flex-shrink: 0;
+  }
+  .archive-count { font-size: .75rem; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+  .archive-delete-all-btn {
+    font-size: .72rem; color: var(--muted); background: none; border: none;
+    cursor: pointer; transition: color .12s; padding: 0;
+  }
+  .archive-delete-all-btn:hover { color: var(--red); }
+
+  /* アーカイブ保存フラッシュ */
+  .archive-toast {
+    position: fixed; bottom: calc(var(--footer-h) + 1rem); left: 50%; transform: translateX(-50%);
+    background: var(--bg3); border: 1px solid var(--accent);
+    color: var(--accent2); border-radius: 8px; padding: .45rem 1.25rem;
+    font-size: .8rem; font-family: 'JetBrains Mono', monospace;
+    z-index: 400; opacity: 0; transition: opacity .2s; pointer-events: none;
+  }
+  .archive-toast.show { opacity: 1; }
+
+  .party-footer-inner {
+    width: 100%; max-width: 1100px;
+    padding: 0 1.25rem .4rem;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: .5rem;
+    align-items: stretch;
+  }
+
+  /* 特性ポップアップ */
+  .ability-popup {
+    display: none;
+    position: fixed; z-index: 300;
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 10px; padding: .75rem 1rem;
+    box-shadow: 0 8px 32px #00000099;
+    min-width: 180px;
+  }
+  .ability-popup.show { display: block; }
+  .ability-popup-title {
+    font-size: .75rem; font-weight: 700; color: var(--muted);
+    margin-bottom: .5rem; letter-spacing: .04em;
+  }
+  .ability-option {
+    display: flex; align-items: center; gap: .5rem;
+    padding: .3rem .4rem; border-radius: 6px;
+    cursor: pointer; font-size: .8rem;
+    transition: background .1s; user-select: none;
+  }
+  .ability-option:hover { background: var(--bg3); }
+  .ability-option input[type="checkbox"] {
+    accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer;
+  }
+  .ability-tag {
+    font-size: .6rem; padding: .05rem .3rem; border-radius: 3px;
+    background: var(--bg3); border: 1px solid var(--border); color: var(--muted);
+    font-family: 'JetBrains Mono', monospace; margin-left: auto;
+  }
+  .ability-tag.active { background: #0f766e33; border-color: #14b8a688; color: var(--teal); }
+  .party-slot {
+    position: relative;
+    display: flex; flex-direction: column; align-items: center;
+    gap: .15rem;
+  }
+
+  /* アイコンエリア（クリックで検索ドロップダウンを開く） */
+  .party-icon-btn {
+    width: 100%; aspect-ratio: 1;
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 8px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color .15s; position: relative; overflow: hidden;
+    flex-shrink: 0;
+    height: 0; padding-bottom: 100%;
+  }
+  .party-icon-btn:hover { border-color: var(--accent); }
+  .party-icon-btn.filled { border-color: var(--accent); }
+  .party-icon-btn img {
+    width: 80%; height: 80%;
+    image-rendering: pixelated; object-fit: contain;
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  }
+  .party-icon-btn .slot-num {
+    font-size: .6rem; color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+/* 道具ボタン（右下の＋） */
+.item-add-btn {
+  position: absolute; bottom: 3%; right: 3%;
+  width: 30%; height: 30%; border-radius: 50%;
+  background: var(--bg2); border: 1px solid var(--border);
+  color: var(--muted); font-size: .55em; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; z-index: 5;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.item-add-btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* 道具アイコンバッジ（選択済み） */
+.item-badge {
+  position: absolute; bottom: 3%; right: 3%;
+  width: 28%; height: 28%; border-radius: 50%;
+  background: var(--bg2); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 5; cursor: pointer; overflow: hidden;
+}
+.item-badge img {
+  width: 100%; height: 100%;
+  image-rendering: pixelated; object-fit: contain;
+}
+  /* 道具オーバーレイ（ポケモン検索と同じ構造・別ID） */
+  .item-search-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: #00000055;
+    z-index: 160;
+    align-items: flex-end; justify-content: center;
+  }
+  .item-search-overlay.show { display: flex; }
+  .item-search-panel {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 14px 14px 0 0;
+    width: min(860px, 100vw);
+    max-height: calc(100vh - 64px);
+    display: flex; flex-direction: column;
+    box-shadow: 0 -8px 32px #00000088;
+    padding: 1rem 1.25rem 1.5rem;
+  }
+  .item-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    gap: .4rem;
+    overflow-y: auto; flex: 1;
+    align-content: start;
+  }
+  .item-category-label {
+    grid-column: 1 / -1;
+    font-size: .72rem; font-weight: 600;
+    color: var(--accent2);
+    padding: .5rem .2rem .15rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: .1rem;
+    letter-spacing: .04em;
+  }
+  .item-category-label:first-child { padding-top: .1rem; }
+  .item-grid-item {
+    display: flex; flex-direction: column; align-items: center;
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 8px; padding: .35rem .2rem .3rem;
+    cursor: pointer; transition: all .12s; user-select: none;
+  }
+  .item-grid-item:hover { border-color: var(--accent); background: #1e2535; }
+  .item-grid-item.selected-item { border-color: var(--accent); background: #1e253588; }
+  .item-grid-item img {
+    width: 40px; height: 40px;
+    image-rendering: pixelated; object-fit: contain;
+  }
+  .item-grid-item .igname {
+    font-size: .68rem; color: var(--text); text-align: center;
+    line-height: 1.3; margin-top: .1rem;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;
+  }
+  .party-slot-name {
+    font-size: .72rem; font-weight: 500; color: var(--accent2);
+    text-align: center; width: 100%;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    line-height: 1.2;
+  }
+  .party-slot-name.empty-name { color: var(--muted); }
+  .party-slot-types {
+    display: flex; gap: .2rem; justify-content: center; flex-wrap: wrap;
+  }
+  .party-slot-type-badge {
+    font-size: .6rem; padding: .05rem .3rem; border-radius: 3px;
+    background: var(--bg3); border: 1px solid var(--border);
+    color: var(--muted); line-height: 1.4;
+  }
+
+  /* パーティ用ドロップダウン（大きめグリッド） */
+  .party-search-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: #00000055;
+    z-index: 150;
+    align-items: flex-end; justify-content: center;
+  }
+  .party-search-overlay.show { display: flex; }
+  .party-search-panel {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 14px 14px 0 0;
+    width: min(860px, 100vw);
+    max-height: calc(100vh - 64px);
+    display: flex; flex-direction: column;
+    box-shadow: 0 -8px 32px #00000088;
+    padding: 1rem 1.25rem 1.5rem;
+  }
+  .party-search-header {
+    display: flex; align-items: center; gap: .75rem;
+    margin-bottom: .875rem;
+  }
+  .party-search-title { font-size: .85rem; font-weight: 700; color: var(--muted); white-space: nowrap; }
+  .party-search-input {
+    flex: 1; background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 7px; color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif; font-size: .875rem;
+    padding: .45rem .75rem; outline: none; transition: border-color .15s;
+  }
+  .party-search-input:focus { border-color: var(--accent); }
+  .party-search-close {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 1.1rem; padding: .2rem; transition: color .15s; flex-shrink: 0;
+  }
+  .party-search-close:hover { color: var(--red); }
+  .party-search-clear {
+    font-size: .75rem; color: var(--muted); background: none; border: none;
+    cursor: pointer; padding: .2rem .5rem; transition: color .12s; white-space: nowrap; flex-shrink: 0;
+  }
+  .party-search-clear:hover { color: var(--red); }
+  .party-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    gap: .4rem;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .party-grid-item {
+    display: flex; flex-direction: column; align-items: center;
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 8px; padding: .35rem .2rem .3rem;
+    cursor: pointer; transition: all .12s; user-select: none;
+  }
+  .party-grid-item:hover { border-color: var(--accent); background: #1e2535; }
+  .party-grid-item.selected-item { border-color: var(--accent); background: #1e253588; }
+  .party-grid-item img {
+    width: 52px; height: 52px;
+    image-rendering: pixelated; object-fit: contain;
+  }
+  .party-grid-item .pgname {
+    font-size: .68rem; color: var(--text); text-align: center;
+    line-height: 1.3; margin-top: .1rem;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;
+  }
+  .party-grid-item .pgtypes {
+    font-size: .58rem; color: var(--muted); text-align: center;
+  }
+
+  @media (max-width: 700px) {
+    .controls { grid-template-columns: 1fr; }
+    .container { padding: 1rem; }
+    .checker-slot { min-width: 100%; }
+    .party-footer-inner { gap: .25rem; padding: 0 .5rem; }
+    .party-grid { grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); }
+    .party-grid-item img { width: 44px; height: 44px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header>
+  <div class="header-left">
+    <h1>タイプ補完チェッカー</h1>
+    <span class="subtitle">M-A / シングル</span>
+  </div>
+  <button class="hamburger" id="hamburger-btn" title="除外設定">
+    <span></span><span></span><span></span>
+    <div class="exclude-badge" id="exclude-badge"></div>
+  </button>
+</header>
+
+<!-- ===== MODAL: 各種設定 ===== -->
+<div class="modal-overlay" id="exclude-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">各種設定</span>
+      <button class="modal-close" id="modal-close-btn">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-desc">ポケモンをクリックで計算から除外。特性を持つポケモンはクリック後に特性のON/OFFも切り替えられます。</p>
+      <input type="text" class="search-input-full" id="exclude-search" placeholder="ポケモン名・タイプで絞り込み...">
+      <div class="exclude-list" id="exclude-list"></div>
+    </div>
+    <div class="modal-footer">
+      <span class="exclude-count" id="exclude-count">0匹 除外中</span>
+      <button class="text-btn" id="exclude-clear-btn">すべて解除</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MAIN ===== -->
+<div class="container">
+
+  <div class="page-tabs">
+    <button class="page-tab active" data-page="search">補完を探す</button>
+    <button class="page-tab" data-page="checker">カバー・穴チェック</button>
+  </div>
+
+  <!-- PAGE: 補完を探す -->
+  <div class="page active" id="page-search">
+
+    <div class="tabs">
+      <button class="tab active" data-mode="pair">2匹</button>
+      <button class="tab" data-mode="trio">3匹</button>
+    </div>
+
+    <div class="controls">
+      <div class="control-group">
+        <label>固定ポケモン <span id="pin-hint" style="text-transform:none;font-size:.7rem;">(選択で相方を絞り込む)</span></label>
+        <div class="pin-area" id="pin-area"></div>
+      </div>
+      <button class="run-btn" id="run-btn">計算する</button>
+    </div>
+
+    <!-- 必須カバータイプ -->
+    <div class="collapsible-panel">
+      <div class="collapsible-header" id="req-header">
+        <span class="collapsible-title">必須カバータイプ<span class="hint hint-teal" id="req-hint"></span></span>
+        <span class="collapsible-toggle" id="req-toggle">▼</span>
+      </div>
+      <div class="collapsible-body" id="req-body">
+        <div class="type-btn-grid" id="req-type-grid"></div>
+        <button class="panel-clear-btn" id="req-clear">クリア</button>
+      </div>
+    </div>
+
+    <!-- 穴タイプ優先ソート -->
+    <div class="collapsible-panel">
+      <div class="collapsible-header" id="sort-header">
+        <span class="collapsible-title">穴タイプ優先ソート<span class="hint hint-amber" id="sort-hint"></span></span>
+        <span class="collapsible-toggle" id="sort-toggle">▼</span>
+      </div>
+      <div class="collapsible-body" id="sort-body">
+        <div class="type-btn-grid" id="sort-type-grid"></div>
+        <button class="panel-clear-btn" id="sort-clear">クリア</button>
+      </div>
+    </div>
+
+    <!-- 進捗 -->
+    <div class="progress-wrap" id="progress-wrap">
+      <div class="progress-bar-bg"><div class="progress-bar" id="progress-bar"></div></div>
+      <div class="progress-text" id="progress-text">計算中...</div>
+    </div>
+
+    <!-- フィルタータブ -->
+    <div class="filter-tabs" id="filter-tabs" style="display:none">
+      <button class="filter-tab active" data-filter="perfect">完全補完 <span class="count" id="cnt-perfect">0</span></button>
+      <button class="filter-tab" data-filter="near">等倍1タイプ <span class="count" id="cnt-near">0</span></button>
+      <button class="filter-tab" data-filter="all">全結果 <span class="count" id="cnt-all">0</span></button>
+    </div>
+
+    <div class="result-summary" id="result-summary"></div>
+    <div class="results-list" id="results-list">
+      <div class="empty">条件を選んで「計算する」を押してください</div>
+    </div>
+  </div>
+
+  <!-- PAGE: カバー・穴チェック -->
+  <div class="page" id="page-checker">
+    <div class="section-panel">
+      <h2>カバー・穴チェック</h2>
+      <p>最大3匹まで選んで、タイプ相性を確認できます。</p>
+      <div class="checker-slots" id="checker-slots"></div>
+      <div class="checker-result" id="checker-result">
+        <div class="empty" style="padding:1.5rem">ポケモンを1匹以上選んでください</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===== 道具検索オーバーレイ ===== -->
+<div class="item-search-overlay" id="item-search-overlay">
+  <div class="item-search-panel">
+    <div class="party-search-header">
+      <span class="party-search-title" id="item-search-title">道具を選ぶ</span>
+      <input type="text" class="party-search-input" id="item-search-input" placeholder="道具名で絞り込み...">
+      <button class="party-search-clear" id="item-search-clear-btn">クリア</button>
+      <button class="party-search-close" id="item-search-close">✕</button>
+    </div>
+    <div class="item-grid" id="item-grid"></div>
+  </div>
+</div>
+
+<!-- ===== PARTY 検索オーバーレイ ===== -->
+<div class="party-search-overlay" id="party-search-overlay">
+  <div class="party-search-panel">
+    <div class="party-search-header">
+      <span class="party-search-title" id="party-search-title">スロット1</span>
+      <input type="text" class="party-search-input" id="party-search-input" placeholder="ポケモン名・タイプで絞り込み...">
+      <button class="party-search-clear" id="party-search-clear-btn">クリア</button>
+      <button class="party-search-close" id="party-search-close">✕</button>
+    </div>
+    <div class="party-grid" id="party-grid"></div>
+  </div>
+</div>
+
+<!-- ===== PARTY FOOTER ===== -->
+<div class="party-footer">
+  <div class="party-toolbar">
+    <div class="set-tabs" id="set-tabs"></div>
+    <div class="archive-toolbar-right">
+      <input type="text" class="archive-memo-input" id="archive-memo-input" placeholder="所感メモ...">
+      <button class="archive-btn" id="archive-save-btn">アーカイブ</button>
+      <button class="archive-load-btn" id="archive-open-btn">ロード</button>
+      <button class="party-clear-btn" id="party-clear-btn">全クリア</button>
+    </div>
+  </div>
+  <div class="party-footer-inner" id="party-footer-inner"></div>
+</div>
+
+<!-- ===== ARCHIVE MODAL ===== -->
+<div class="archive-overlay" id="archive-overlay">
+  <div class="archive-modal">
+    <div class="archive-modal-header">
+      <span class="archive-modal-title">アーカイブ</span>
+      <button class="archive-modal-close" id="archive-modal-close">✕</button>
+    </div>
+    <div class="archive-modal-body" id="archive-modal-body"></div>
+    <div class="archive-modal-footer">
+      <span class="archive-count" id="archive-count">0件</span>
+      <button class="archive-delete-all-btn" id="archive-delete-all-btn">すべて削除</button>
+      <button class="archive-delete-all-btn" id="archive-download-btn">JSONダウンロード</button>
+    </div>
+  </div>
+</div>
+
+<!-- アーカイブ保存トースト -->
+<div class="archive-toast" id="archive-toast">アーカイブに保存しました</div>
+
+<!-- ===== 特性ポップアップ ===== -->
+<div class="ability-popup" id="ability-popup"></div>
+
+<script src="typechart.js"></script>
+<script src="data.js"></script>
+<script>
+// ============================================================
+// スプライトURL
+// ============================================================
+// スプライトURL — Smogon XY sprites を使用
+// data.jsの各ポケモンに slug フィールドが入っているのでそのまま使う
+const SPRITE_URL = slug => `https://www.smogon.com/dex/media/sprites/xy/${slug}.gif`;
+const POKESPRITE_BASE = 'https://raw.githubusercontent.com/msikma/pokesprite/master/items-outline';
+const ITEM_SPRITE_URL = (slug, category) => {
+  switch (category) {
+    case 'berry':      return `${POKESPRITE_BASE}/berry/${slug.replace('-berry', '')}.png`;
+    case 'plate':      return `${POKESPRITE_BASE}/plate/${slug.replace('-plate', '')}.png`;
+    case 'z-crystal':  return `${POKESPRITE_BASE}/z-crystals/${slug}--held.png`;
+    case 'mega-stone': return `${POKESPRITE_BASE}/mega-stone/${slug}.png`;
+    case 'evo-item':   return `${POKESPRITE_BASE}/evo-item/${slug}.png`;
+    default:           return `${POKESPRITE_BASE}/hold-item/${slug}.png`;
+  }
+};
+
+// ============================================================
+// 状態
+// ============================================================
+let currentMode   = 'pair';
+let allResults    = [];
+let currentFilter = 'perfect';
+let worker        = null;
+let excludedRanks = new Set();
+let sortTypes     = [];
+let requiredTypes = [];
+// rank → true のポケモンは特性を無効扱い（immune_typesを空として計算）
+let disabledAbilities = new Set();
+// rank → true のポケモンは半減特性を無効扱い（resist_typesを空として計算）
+let disabledResists = new Set();
+const pinState     = { 0: null, 1: null };
+const checkerState = { 0: null, 1: null, 2: null };
+const partyState   = { 0: null, 1: null, 2: null, 3: null, 4: null, 5: null };
+const DISPLAY_LIMIT = 200;
+
+// ============================================================
+// マイセット (localStorage)
+// ============================================================
+const SET_COUNT = 5;
+let currentSetIdx = 0; // 0〜4
+
+// partyStateとitemStateをまとめてlocalStorageに保存するため、
+// itemStateへの参照を外部から受け取るコールバック方式にする
+let _getItemState = () => new Array(6).fill(null);
+let _setItemState = () => {};
+let _renderAllSlots = () => {};
+
+function saveCurrentSet() {
+  const sets = loadSetsRaw();
+  const items = _getItemState();
+  sets[currentSetIdx] = {
+    party: Array.from({ length: 6 }, (_, i) => ({
+      pkRank: partyState[i] ? partyState[i].rank : null,
+      itemSlug: items[i] ? items[i].slug : null,
+    }))
+  };
+  localStorage.setItem('mySets', JSON.stringify(sets));
+  renderSetTabs();
+}
+
+function loadSet(idx) {
+  const sets = loadSetsRaw();
+  const set  = sets[idx];
+  // partyStateをクリア
+  for (let i = 0; i < 6; i++) partyState[i] = null;
+  const newItems = new Array(6).fill(null);
+  if (set && set.party) {
+    set.party.forEach((s, i) => {
+      if (s.pkRank !== null) partyState[i] = POKEMON_LIST.find(p => p.rank === s.pkRank) || null;
+      if (s.itemSlug) newItems[i] = ITEM_LIST.find(it => it.slug === s.itemSlug) || null;
+    });
+  }
+  _setItemState(newItems);
+  _renderAllSlots();
+}
+
+function loadSetsRaw() {
+  try { return JSON.parse(localStorage.getItem('mySets')) || Array(SET_COUNT).fill(null); }
+  catch { return Array(SET_COUNT).fill(null); }
+}
+
+function setHasData(idx) {
+  const sets = loadSetsRaw();
+  return !!(sets[idx] && sets[idx].party && sets[idx].party.some(s => s.pkRank !== null));
+}
+
+function renderSetTabs() {
+  const container = document.getElementById('set-tabs');
+  container.innerHTML = '';
+  for (let i = 0; i < SET_COUNT; i++) {
+    const btn = document.createElement('button');
+    btn.className = 'set-tab' + (i === currentSetIdx ? ' active' : '') + (setHasData(i) ? ' has-data' : '');
+    btn.textContent = `SET ${i + 1}`;
+    btn.addEventListener('click', () => {
+      // 現在のセットを自動保存してから切り替え
+      saveCurrentSet();
+      currentSetIdx = i;
+      loadSet(i);
+      renderSetTabs();
+    });
+    container.appendChild(btn);
+  }
+}
+
+// ============================================================
+// ページ切り替え（状態はDOMに保持されるのでdisplay切り替えのみ）
+// ============================================================
+document.querySelectorAll('.page-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.page-tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('page-' + btn.dataset.page).classList.add('active');
+  });
+});
+
+// ============================================================
+// 検索ウィジェット生成（クリックで全候補表示対応）
+// ============================================================
+function createSearchInput({ placeholder = 'ポケモン名またはタイプ...', onSelect, onClear, small = false }) {
+  const wrap = document.createElement('div');
+  wrap.className = 'search-wrap';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'pin-input';
+  input.placeholder = placeholder;
+  input.autocomplete = 'off';
+
+  const dropdown = document.createElement('div');
+  dropdown.className = 'search-dropdown';
+
+  wrap.appendChild(input);
+  wrap.appendChild(dropdown);
+
+  let focusedIdx = -1;
+
+  function getFiltered(q) {
+    if (!q) return POKEMON_LIST.slice(0, 60); // 空欄 → 全候補(上位60)
+    return POKEMON_LIST.filter(p =>
+      p.name.includes(q) || p.types.some(t => t.includes(q))
+    ).slice(0, 50);
+  }
+
+  function renderDropdown(q) {
+    const items = getFiltered(q);
+    focusedIdx = -1;
+    if (!items.length) { dropdown.classList.remove('show'); return; }
+    // rankは表示しない
+    dropdown.innerHTML = items.map((p, i) =>
+      `<div class="search-option" data-rank="${p.rank}" data-i="${i}">
+        <span>${p.name}</span>
+        <span class="opt-meta"><span class="opt-types">${p.types.join('・')}</span></span>
+      </div>`
+    ).join('');
+    dropdown.classList.add('show');
+    dropdown.querySelectorAll('.search-option').forEach(opt => {
+      opt.addEventListener('mousedown', e => {
+        e.preventDefault();
+        selectByRank(parseFloat(opt.dataset.rank));
+      });
+    });
+  }
+
+  function selectByRank(rank) {
+    const p = POKEMON_LIST.find(x => x.rank === rank);
+    if (!p) return;
+    // 表示はポケモン名のみ（rankなし）
+    input.value = p.name;
+    input.classList.add('selected');
+    dropdown.classList.remove('show');
+    onSelect(p);
+  }
+
+  function clear() {
+    input.value = '';
+    input.classList.remove('selected');
+    dropdown.classList.remove('show');
+    onClear();
+  }
+
+  input.addEventListener('input', () => {
+    if (!input.value) onClear();
+    input.classList.remove('selected');
+    renderDropdown(input.value);
+  });
+
+  // クリック/フォーカスで即ドロップダウン表示
+  input.addEventListener('focus', () => renderDropdown(input.classList.contains('selected') ? '' : input.value));
+  input.addEventListener('click', () => renderDropdown(input.classList.contains('selected') ? '' : input.value));
+
+  input.addEventListener('blur', () => setTimeout(() => dropdown.classList.remove('show'), 150));
+  input.addEventListener('keydown', e => {
+    const opts = dropdown.querySelectorAll('.search-option');
+    if (e.key === 'ArrowDown') { e.preventDefault(); focusedIdx = Math.min(focusedIdx+1, opts.length-1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); focusedIdx = Math.max(focusedIdx-1, 0); }
+    else if (e.key === 'Enter' && focusedIdx >= 0) { e.preventDefault(); opts[focusedIdx].dispatchEvent(new MouseEvent('mousedown')); return; }
+    else if (e.key === 'Escape') { dropdown.classList.remove('show'); return; }
+    opts.forEach((o, i) => o.classList.toggle('focused', i === focusedIdx));
+  });
+
+  wrap.setByRank = selectByRank;
+  wrap.clear = clear;
+  return wrap;
+}
+
+// ============================================================
+// モード切替
+// ============================================================
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentMode = btn.dataset.mode;
+    pinState[0] = null; pinState[1] = null;
+    buildPinArea();
+    resetResults();
+  });
+});
+
+function buildPinArea() {
+  const area = document.getElementById('pin-area');
+  document.getElementById('pin-hint').textContent = currentMode === 'pair'
+    ? '(選択で相方を絞り込む)' : '(1〜2匹選択で残りを探す)';
+  area.innerHTML = '';
+  const count = currentMode === 'pair' ? 1 : 2;
+  for (let i = 0; i < count; i++) {
+    const row = document.createElement('div');
+    row.className = 'pin-row';
+    const sw = createSearchInput({
+      onSelect: p => { pinState[i] = p.rank; },
+      onClear:  () => { pinState[i] = null; },
+    });
+    const clearBtn = document.createElement('button');
+    clearBtn.className = 'pin-clear';
+    clearBtn.title = 'クリア';
+    clearBtn.textContent = '✕';
+    clearBtn.addEventListener('click', () => { sw.clear(); pinState[i] = null; });
+    const badge = document.createElement('span');
+    badge.className = 'pin-badge';
+    badge.textContent = i === 0 ? '固定1' : '固定2';
+    row.appendChild(sw); row.appendChild(clearBtn); row.appendChild(badge);
+    area.appendChild(row);
+  }
+}
+
+// ============================================================
+// 折りたたみパネル
+// ============================================================
+function initCollapsible(headerId, bodyId, toggleId) {
+  document.getElementById(headerId).addEventListener('click', () => {
+    const body = document.getElementById(bodyId);
+    const tog  = document.getElementById(toggleId);
+    const open = body.style.display !== 'none' && body.style.display !== '';
+    body.style.display = open ? 'none' : 'block';
+    tog.classList.toggle('open', !open);
+  });
+}
+initCollapsible('req-header',  'req-body',  'req-toggle');
+initCollapsible('sort-header', 'sort-body', 'sort-toggle');
+
+// ============================================================
+// 必須カバータイプ
+// ============================================================
+(function() {
+  const grid = document.getElementById('req-type-grid');
+  ALL_TYPES.forEach(t => {
+    const btn = document.createElement('button');
+    btn.className = 'type-toggle-btn'; btn.textContent = t;
+    btn.addEventListener('click', () => {
+      const idx = requiredTypes.indexOf(t);
+      if (idx === -1) { requiredTypes.push(t); btn.classList.add('active-teal'); }
+      else { requiredTypes.splice(idx, 1); btn.classList.remove('active-teal'); }
+      updateHint('req-hint', requiredTypes, '必須');
+    });
+    grid.appendChild(btn);
+  });
+  document.getElementById('req-clear').addEventListener('click', () => {
+    requiredTypes = [];
+    grid.querySelectorAll('.type-toggle-btn').forEach(b => b.classList.remove('active-teal'));
+    updateHint('req-hint', requiredTypes, '必須');
+  });
+})();
+
+// ============================================================
+// 穴タイプ優先ソート
+// ============================================================
+(function() {
+  const grid = document.getElementById('sort-type-grid');
+  ALL_TYPES.forEach(t => {
+    const btn = document.createElement('button');
+    btn.className = 'type-toggle-btn'; btn.textContent = t;
+    btn.addEventListener('click', () => {
+      const idx = sortTypes.indexOf(t);
+      if (idx === -1) { sortTypes.push(t); btn.classList.add('active-amber'); }
+      else { sortTypes.splice(idx, 1); btn.classList.remove('active-amber'); }
+      updateHint('sort-hint', sortTypes, '優先');
+      if (allResults.length > 0) renderResults();
+    });
+    grid.appendChild(btn);
+  });
+  document.getElementById('sort-clear').addEventListener('click', () => {
+    sortTypes = [];
+    grid.querySelectorAll('.type-toggle-btn').forEach(b => b.classList.remove('active-amber'));
+    updateHint('sort-hint', sortTypes, '優先');
+    if (allResults.length > 0) renderResults();
+  });
+})();
+
+function updateHint(id, arr, label) {
+  document.getElementById(id).textContent = arr.length > 0 ? `(${arr.join('・')}を${label})` : '';
+}
+
+// ============================================================
+// 計算
+// ============================================================
+document.getElementById('run-btn').addEventListener('click', runCalc);
+
+function runCalc() {
+  if (worker) { worker.terminate(); worker = null; }
+  const pinnedRanks = [];
+  const count = currentMode === 'pair' ? 1 : 2;
+  for (let i = 0; i < count; i++) { if (pinState[i] !== null) pinnedRanks.push(pinState[i]); }
+
+  document.getElementById('run-btn').disabled = true;
+  document.getElementById('filter-tabs').style.display = 'none';
+  document.getElementById('result-summary').textContent = '';
+  document.getElementById('results-list').innerHTML = '<div class="empty">計算中...</div>';
+
+  const pw = document.getElementById('progress-wrap');
+  const pb = document.getElementById('progress-bar');
+  const pt = document.getElementById('progress-text');
+  pw.classList.add('show'); pb.style.width = '0%'; pt.textContent = '計算中...';
+
+  worker = new Worker('worker.js');
+  worker.postMessage({
+    mode: currentMode,
+    pinnedRanks,
+    requiredCoverTypes: [...requiredTypes],
+    excludedRanks: Array.from(excludedRanks),
+    disabledAbilityRanks: Array.from(disabledAbilities),
+    disabledResistRanks: Array.from(disabledResists),
+  });
+  worker.onmessage = e => {
+    if (e.data.type === 'progress') {
+      const pct = Math.round(e.data.done / e.data.total * 100);
+      pb.style.width = pct + '%';
+      pt.textContent = `${e.data.done.toLocaleString()} / ${e.data.total.toLocaleString()} 組 (${pct}%)`;
+    } else if (e.data.type === 'done') {
+      allResults = e.data.results;
+      pw.classList.remove('show');
+      document.getElementById('run-btn').disabled = false;
+      renderResults();
+      worker = null;
+    }
+  };
+}
+
+// ============================================================
+// フィルタータブ
+// ============================================================
+document.querySelectorAll('.filter-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFilter = btn.dataset.filter;
+    renderResults();
+  });
+});
+
+// ============================================================
+// ソート
+// ============================================================
+function applySort(list) {
+  if (!sortTypes.length) return list;
+  return [...list].sort((a, b) => {
+    const sa = a.neutrals.filter(h => sortTypes.includes(h.atk)).length;
+    const sb = b.neutrals.filter(h => sortTypes.includes(h.atk)).length;
+    if (sb !== sa) return sb - sa;
+    return a.neutralCount - b.neutralCount || b.coverCount - a.coverCount;
+  });
+}
+
+// ============================================================
+// 結果表示（rankの〇位は非表示）
+// ============================================================
+function renderResults() {
+  const pinnedRankList = Object.values(pinState).filter(r => r !== null);
+  const perfect = allResults.filter(r => r.neutralCount === 0);
+  const near    = allResults.filter(r => r.neutralCount === 1);
+
+  document.getElementById('cnt-perfect').textContent = perfect.length.toLocaleString();
+  document.getElementById('cnt-near').textContent    = near.length.toLocaleString();
+  document.getElementById('cnt-all').textContent     = allResults.length.toLocaleString();
+  document.getElementById('filter-tabs').style.display = 'flex';
+
+  let list = currentFilter === 'perfect' ? perfect : currentFilter === 'near' ? near : allResults;
+  list = applySort(list);
+  const shown = list.slice(0, DISPLAY_LIMIT);
+
+  document.getElementById('result-summary').textContent =
+    `${list.length.toLocaleString()}組 該当 — 上位${Math.min(list.length, DISPLAY_LIMIT)}件を表示`;
+
+  if (!shown.length) {
+    document.getElementById('results-list').innerHTML = '<div class="empty">該当なし</div>';
+    return;
+  }
+
+  document.getElementById('results-list').innerHTML = shown.map((r, idx) => {
+    // ポケモン名のみ（〇位は非表示）
+    const membersHtml = r.members.map((p, i) =>
+      `<span class="member-chip${pinnedRankList.includes(p.rank) ? ' pinned' : ''}">${p.name}</span>${i < r.members.length-1 ? '<span class="sep">×</span>' : ''}`
+    ).join('');
+    const coversHtml = r.covers.map(t => `<span class="tag tag-cover">${t}</span>`).join('');
+    const holesHtml  = r.neutrals.map(h =>
+      `<span class="tag tag-hole${sortTypes.includes(h.atk) ? ' priority' : ''}">${h.atk}→${h.victim}</span>`
+    ).join('');
+    return `
+      <div class="result-card">
+        <div class="card-rank">${idx+1}</div>
+        <div class="card-body">
+          <div class="card-members">${membersHtml}</div>
+          <div class="tag-row">${coversHtml}${holesHtml}</div>
+        </div>
+        <div class="card-stats">
+          <div class="stat-cover">▶ ${r.coverCount}カバー</div>
+          <div class="stat-hole${r.neutralCount === 0 ? ' stat-zero' : ''}">穴 ${r.neutralCount}${r.neutralCount === 0 ? ' ✓' : ''}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function resetResults() {
+  allResults = [];
+  document.getElementById('results-list').innerHTML = '<div class="empty">条件を選んで「計算する」を押してください</div>';
+  document.getElementById('filter-tabs').style.display = 'none';
+  document.getElementById('result-summary').textContent = '';
+}
+
+// ============================================================
+// 各種設定モーダル（除外＋特性切り替え）
+// ============================================================
+(function() {
+  const overlay   = document.getElementById('exclude-modal');
+  const hamburger = document.getElementById('hamburger-btn');
+  const closeBtn  = document.getElementById('modal-close-btn');
+  const searchEl  = document.getElementById('exclude-search');
+  const listEl    = document.getElementById('exclude-list');
+  const badge     = document.getElementById('exclude-badge');
+  const popup     = document.getElementById('ability-popup');
+
+  hamburger.addEventListener('click', () => { overlay.classList.add('show'); searchEl.focus(); });
+  closeBtn.addEventListener('click',  () => { overlay.classList.remove('show'); popup.classList.remove('show'); });
+  overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.classList.remove('show'); popup.classList.remove('show'); } });
+  document.addEventListener('click', e => {
+    if (!popup.contains(e.target) && !e.target.closest('.exclude-chip')) popup.classList.remove('show');
+  });
+
+  // immune_typesを持つポケモンのrank集合
+  const abilityRanks = new Set(POKEMON_LIST.filter(p => p.immune_types.length > 0).map(p => p.rank));
+  // resist_typesを持つポケモンのrank集合
+  const resistRanks  = new Set(POKEMON_LIST.filter(p => (p.resist_types || []).length > 0).map(p => p.rank));
+
+  function abilityLabel(immune_types) {
+    const map = { 'じめん': 'ふゆう', 'ほのお': 'もらいび', 'くさ': 'そうしょく', 'でんき': 'ちくでん/ひらいしん', 'みず': 'ちょすい/よびみず' };
+    return immune_types.map(t => map[t] || t).join('・');
+  }
+  function resistLabel(resist_types) {
+    const map = {
+      'ほのお,こおり': 'あついしぼう',
+      'ほのお':        'すいほう/たいねつ',
+      'ゴースト':      'きよめのしお',
+    };
+    const key = resist_types.join(',');
+    return map[key] || resist_types.join('・') + '半減特性';
+  }
+
+  function openAbilityPopup(chip, p) {
+    popup.classList.remove('show');
+    const hasImmune = abilityRanks.has(p.rank);
+    const hasResist = resistRanks.has(p.rank);
+    const immuneDisabled = disabledAbilities.has(p.rank);
+    const resistDisabled = disabledResists.has(p.rank);
+
+    let html = '';
+    if (hasImmune) {
+      html += `
+      <label class="ability-option">
+        <input type="checkbox" class="ability-immune-chk" ${immuneDisabled ? '' : 'checked'}>
+        <span>${abilityLabel(p.immune_types)}</span>
+        <span class="ability-tag${immuneDisabled ? '' : ' active'}">${p.immune_types.join('無効・')}無効</span>
+      </label>`;
+    }
+    if (hasResist) {
+      html += `
+      <label class="ability-option">
+        <input type="checkbox" class="ability-resist-chk" ${resistDisabled ? '' : 'checked'}>
+        <span>${resistLabel(p.resist_types)}</span>
+        <span class="ability-tag${resistDisabled ? '' : ' active'}">${p.resist_types.join('・')}半減</span>
+      </label>`;
+    }
+
+    popup.innerHTML = `<div class="ability-popup-title">${p.name} の特性</div>${html}`;
+
+    const immuneChk = popup.querySelector('.ability-immune-chk');
+    if (immuneChk) {
+      immuneChk.addEventListener('change', () => {
+        if (immuneChk.checked) disabledAbilities.delete(p.rank);
+        else disabledAbilities.add(p.rank);
+        const tag = immuneChk.closest('.ability-option').querySelector('.ability-tag');
+        tag.classList.toggle('active', immuneChk.checked);
+        render(searchEl.value);
+      });
+    }
+    const resistChk = popup.querySelector('.ability-resist-chk');
+    if (resistChk) {
+      resistChk.addEventListener('change', () => {
+        if (resistChk.checked) disabledResists.delete(p.rank);
+        else disabledResists.add(p.rank);
+        const tag = resistChk.closest('.ability-option').querySelector('.ability-tag');
+        tag.classList.toggle('active', resistChk.checked);
+        render(searchEl.value);
+      });
+    }
+
+    // 位置：chipの下
+    const rect = chip.getBoundingClientRect();
+    popup.style.top  = (rect.bottom + 6 + window.scrollY) + 'px';
+    popup.style.left = Math.min(rect.left, window.innerWidth - 200) + 'px';
+    popup.classList.add('show');
+  }
+
+  function render(q = '') {
+    const items = POKEMON_LIST.filter(p =>
+      q === '' || p.name.includes(q) || p.types.some(t => t.includes(q))
+    );
+    listEl.innerHTML = items.map(p => {
+      const ex       = excludedRanks.has(p.rank);
+      const hasAbil  = abilityRanks.has(p.rank);
+      const hasRes   = resistRanks.has(p.rank);
+      const abilOff  = disabledAbilities.has(p.rank);
+      const resOff   = disabledResists.has(p.rank);
+      let badge = '';
+      if (hasAbil || hasRes) {
+        const parts = [];
+        if (hasAbil) parts.push(`<span style="color:${abilOff ? 'var(--muted)' : 'var(--teal)'}">無効${abilOff ? 'OFF' : 'ON'}</span>`);
+        if (hasRes)  parts.push(`<span style="color:${resOff  ? 'var(--muted)' : 'var(--amber)'}">半減${resOff  ? 'OFF' : 'ON'}</span>`);
+        badge = `<div style="position:absolute;bottom:2px;left:0;right:0;text-align:center;font-size:.5rem;font-family:'JetBrains Mono',monospace;line-height:1.2;">${parts.join('<br>')}</div>`;
+      }
+      return `<div class="exclude-chip${ex ? ' excluded' : ''}" data-rank="${p.rank}" title="${p.name}">
+        <img src="${SPRITE_URL(p.slug)}" alt="${p.name}" loading="lazy">
+        ${badge}
+      </div>`;
+    }).join('');
+    listEl.querySelectorAll('.exclude-chip').forEach(chip => {
+      chip.addEventListener('click', e => {
+        const r = parseFloat(chip.dataset.rank);
+        const p = POKEMON_LIST.find(x => x.rank === r);
+        if (abilityRanks.has(r) || resistRanks.has(r)) {
+          // 特性持ち：ポップアップを開く（除外はトグルしない）
+          openAbilityPopup(chip, p);
+        } else {
+          excludedRanks.has(r) ? excludedRanks.delete(r) : excludedRanks.add(r);
+          updateCount(); render(searchEl.value);
+        }
+      });
+      // 右クリックで除外トグル（特性持ちでも除外操作できるように）
+      chip.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        const r = parseFloat(chip.dataset.rank);
+        excludedRanks.has(r) ? excludedRanks.delete(r) : excludedRanks.add(r);
+        updateCount(); render(searchEl.value);
+      });
+    });
+  }
+
+  function updateCount() {
+    const el = document.getElementById('exclude-count');
+    el.textContent = `${excludedRanks.size}匹 除外中`;
+    el.classList.toggle('active', excludedRanks.size > 0);
+    if (excludedRanks.size > 0) {
+      badge.textContent = excludedRanks.size;
+      badge.style.display = 'flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  searchEl.addEventListener('input', () => render(searchEl.value));
+  document.getElementById('exclude-clear-btn').addEventListener('click', () => {
+    excludedRanks.clear(); updateCount(); render(searchEl.value);
+  });
+  render();
+})();
+
+// ============================================================
+// カバー・穴チェッカー（状態保持：DOMは1回だけ構築）
+// ============================================================
+(function() {
+  const slotsEl = document.getElementById('checker-slots');
+  const labels  = ['1匹目', '2匹目', '3匹目'];
+  for (let i = 0; i < 3; i++) {
+    const slot = document.createElement('div');
+    slot.className = 'checker-slot';
+    const lbl = document.createElement('label');
+    lbl.textContent = labels[i];
+    const clrBtn = document.createElement('button');
+    clrBtn.className = 'slot-clear-btn'; clrBtn.textContent = '✕';
+    clrBtn.addEventListener('click', () => { sw.clear(); checkerState[i] = null; updateCheckerResult(); });
+    lbl.appendChild(clrBtn);
+    const sw = createSearchInput({
+      onSelect: p => { checkerState[i] = p; updateCheckerResult(); },
+      onClear:  () => { checkerState[i] = null; updateCheckerResult(); },
+    });
+    slot.appendChild(lbl); slot.appendChild(sw);
+    slotsEl.appendChild(slot);
+  }
+})();
+
+function updateCheckerResult() {
+  const members = [0,1,2].map(i => checkerState[i]).filter(Boolean);
+  const el = document.getElementById('checker-result');
+  if (!members.length) {
+    el.innerHTML = '<div class="empty" style="padding:1.5rem">ポケモンを1匹以上選んでください</div>';
+    return;
+  }
+  function effBadge(v) {
+    if (v === 0)    return `<span class="ev-immune">×0</span>`;
+    if (v === 0.25) return `<span class="ev-resist">×¼</span>`;
+    if (v === 0.5)  return `<span class="ev-resist">×½</span>`;
+    if (v === 1)    return `<span class="ev-normal">×1</span>`;
+    if (v === 2)    return `<span class="ev-super">×2</span>`;
+    if (v === 4)    return `<span class="ev-super">×4</span>`;
+    return `<span>×${v}</span>`;
+  }
+  const rows = ALL_TYPES.map(atk => {
+    const effs = members.map(p => getEffectiveness(atk, p.types, p.immune_types, p.resist_types || []));
+    return { atk, effs, max: Math.max(...effs), min: Math.min(...effs) };
+  });
+  const sections = [
+    { title: '⚠️ 弱点（誰かが食らう）',                 cls: 'ev-super',  items: rows.filter(r => r.max > 1) },
+    { title: '✅ 無効（誰かが完全回避）',                cls: 'ev-immune', items: rows.filter(r => r.min === 0) },
+    { title: '🛡️ 半減カバー（全員等倍以下・誰かが抵抗）', cls: 'ev-resist', items: rows.filter(r => r.min < 1 && r.min > 0 && r.max <= 1) },
+    { title: '— 等倍（全員）',                           cls: 'ev-normal', items: rows.filter(r => r.max === 1 && r.min === 1) },
+  ];
+  const headerHtml = members.map(p =>
+    `<span class="member-chip" style="font-size:.75rem">${p.name}</span>`
+  ).join('<span class="sep">×</span>');
+  const sectionsHtml = sections.map(s => {
+    if (!s.items.length) return '';
+    return `<div style="margin-bottom:.875rem">
+      <div class="eff-section-title">${s.title} <span style="font-family:'JetBrains Mono',monospace">(${s.items.length})</span></div>
+      <div class="type-eff-grid">
+        ${s.items.map(r => `
+          <div class="type-eff-row">
+            <span class="eff-type ${s.cls}">${r.atk}</span>
+            <span class="eff-val">${r.effs.map(effBadge).join('')}</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+  el.innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;margin-bottom:1rem">${headerHtml}</div>
+    ${sectionsHtml}`;
+}
+
+// ============================================================
+// パーティフッター — スロット + セット保存/読込 + クリアボタン
+// ============================================================
+
+(function() {
+  const inner = document.getElementById('party-footer-inner');
+
+  // ===== ポケモン検索オーバーレイ =====
+  const pkOverlay  = document.getElementById('party-search-overlay');
+  const pkGrid     = document.getElementById('party-grid');
+  const pkInput    = document.getElementById('party-search-input');
+  const pkTitle    = document.getElementById('party-search-title');
+  const pkClose    = document.getElementById('party-search-close');
+  const pkClear    = document.getElementById('party-search-clear-btn');
+
+  // ===== 道具検索オーバーレイ =====
+  const itOverlay  = document.getElementById('item-search-overlay');
+  const itGrid     = document.getElementById('item-grid');
+  const itInput    = document.getElementById('item-search-input');
+  const itTitle    = document.getElementById('item-search-title');
+  const itClose    = document.getElementById('item-search-close');
+  const itClear    = document.getElementById('item-search-clear-btn');
+
+  let activePkSlot   = null;
+  let activeItSlot   = null;
+  const itemState    = new Array(6).fill(null);
+  const slotEls      = [];
+
+  // セット機能のコールバックを外部変数に登録
+  _getItemState    = () => [...itemState];
+  _setItemState    = (arr) => { arr.forEach((v, i) => { itemState[i] = v; }); };
+  _renderAllSlots  = () => { for (let i = 0; i < 6; i++) renderSlot(i); };
+
+  // ===== スロット構築 =====
+  for (let i = 0; i < 6; i++) {
+    const slot = document.createElement('div');
+    slot.className = 'party-slot';
+
+    const iconBtn = document.createElement('div');
+    iconBtn.className = 'party-icon-btn';
+
+    const itemBtn = document.createElement('div');
+    itemBtn.className = 'item-add-btn';
+    itemBtn.textContent = '+';
+    itemBtn.title = '道具を選ぶ';
+    iconBtn.appendChild(itemBtn);
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'party-slot-name empty-name';
+    nameEl.textContent = '―';
+
+    const typesEl = document.createElement('div');
+    typesEl.className = 'party-slot-types';
+
+    slot.appendChild(iconBtn);
+    slot.appendChild(nameEl);
+    slot.appendChild(typesEl);
+    inner.appendChild(slot);
+    slotEls.push({ iconBtn, nameEl, typesEl, itemBtn });
+
+    iconBtn.addEventListener('click', (e) => {
+      if (e.target === itemBtn || itemBtn.contains(e.target)) return;
+      openPkOverlay(i);
+    });
+    itemBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openItOverlay(i);
+    });
+  }
+
+  // ===== スロット描画 =====
+  function renderSlot(i) {
+    const { iconBtn, nameEl, typesEl, itemBtn } = slotEls[i];
+    const p    = partyState[i];
+    const item = itemState[i];
+
+    [...iconBtn.children].forEach(c => {
+      if (c !== itemBtn) c.remove();
+    });
+
+    if (p) {
+      const img = document.createElement('img');
+      img.src = SPRITE_URL(p.slug);
+      img.alt = p.name;
+      iconBtn.insertBefore(img, itemBtn);
+      iconBtn.classList.add('filled');
+      nameEl.textContent = p.name;
+      nameEl.classList.remove('empty-name');
+      typesEl.innerHTML = p.types.map(t =>
+        `<span class="party-slot-type-badge">${t}</span>`
+      ).join('');
+    } else {
+      iconBtn.classList.remove('filled');
+      nameEl.textContent = '―';
+      nameEl.classList.add('empty-name');
+      typesEl.innerHTML = '';
+    }
+
+    const oldBadge = iconBtn.querySelector('.item-badge');
+    if (oldBadge) oldBadge.remove();
+
+    if (item) {
+      itemBtn.style.display = 'none';
+      const badge = document.createElement('div');
+      badge.className = 'item-badge';
+      badge.title = item.name;
+      const iimg = document.createElement('img');
+      iimg.src = ITEM_SPRITE_URL(item.slug, item.category);
+      iimg.alt = item.name;
+      badge.appendChild(iimg);
+      badge.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openItOverlay(i);
+      });
+      iconBtn.appendChild(badge);
+    } else {
+      itemBtn.style.display = 'flex';
+    }
+  }
+
+  // ===== ポケモン検索オーバーレイ =====
+  function openPkOverlay(i) {
+    activePkSlot = i;
+    pkTitle.textContent = `スロット ${i + 1}`;
+    pkInput.value = '';
+    pkOverlay.classList.add('show');
+    renderPkGrid('');
+    pkInput.focus();
+  }
+  function closePkOverlay() {
+    pkOverlay.classList.remove('show');
+    activePkSlot = null;
+  }
+  function renderPkGrid(q) {
+    const items = POKEMON_LIST.filter(p =>
+      q === '' || p.name.includes(q) || p.types.some(t => t.includes(q))
+    );
+    pkGrid.innerHTML = items.map(p => {
+      const sel = partyState[activePkSlot] && partyState[activePkSlot].rank === p.rank;
+      return `<div class="party-grid-item${sel ? ' selected-item' : ''}" data-rank="${p.rank}">
+        <img src="${SPRITE_URL(p.slug)}" alt="${p.name}" loading="lazy">
+        <div class="pgname">${p.name}</div>
+        <div class="pgtypes">${p.types.join('・')}</div>
+      </div>`;
+    }).join('');
+    pkGrid.querySelectorAll('.party-grid-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const p = POKEMON_LIST.find(x => x.rank === parseFloat(el.dataset.rank));
+        if (!p || activePkSlot === null) return;
+        partyState[activePkSlot] = p;
+        renderSlot(activePkSlot);
+        closePkOverlay();
+      });
+    });
+  }
+  pkInput.addEventListener('input', () => renderPkGrid(pkInput.value));
+  pkClose.addEventListener('click', closePkOverlay);
+  pkOverlay.addEventListener('click', e => { if (e.target === pkOverlay) closePkOverlay(); });
+  pkClear.addEventListener('click', () => {
+    if (activePkSlot === null) return;
+    partyState[activePkSlot] = null;
+    renderSlot(activePkSlot);
+    closePkOverlay();
+  });
+
+  // ===== 道具検索オーバーレイ =====
+  function openItOverlay(i) {
+    activeItSlot = i;
+    itTitle.textContent = `スロット ${i + 1} — 道具`;
+    itInput.value = '';
+    itOverlay.classList.add('show');
+    renderItGrid('');
+    itInput.focus();
+  }
+  function closeItOverlay() {
+    itOverlay.classList.remove('show');
+    activeItSlot = null;
+  }
+  function renderItGrid(q) {
+    const CATEGORY_LABELS = {
+      'hold-item':  '持ち物',
+      'berry':      'きのみ',
+      'mega-stone': 'メガストーン',
+      'plate':      'プレート',
+      'z-crystal':  'Zクリスタル',
+    };
+    const items = ITEM_LIST.filter(it =>
+      q === '' || it.name.includes(q)
+    );
+    const isFiltering = q !== '';
+    let html = '';
+    let lastCat = null;
+    for (const it of items) {
+      if (!isFiltering && it.category !== lastCat) {
+        const label = CATEGORY_LABELS[it.category] || it.category;
+        html += `<div class="item-category-label">${label}</div>`;
+        lastCat = it.category;
+      }
+      const sel = itemState[activeItSlot] && itemState[activeItSlot].slug === it.slug;
+      html += `<div class="item-grid-item${sel ? ' selected-item' : ''}" data-slug="${it.slug}">
+        <img src="${ITEM_SPRITE_URL(it.slug, it.category)}" alt="${it.name}" loading="lazy">
+        <div class="igname">${it.name}</div>
+      </div>`;
+    }
+    itGrid.innerHTML = html;
+    itGrid.querySelectorAll('.item-grid-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const it = ITEM_LIST.find(x => x.slug === el.dataset.slug);
+        if (!it || activeItSlot === null) return;
+        itemState[activeItSlot] = it;
+        renderSlot(activeItSlot);
+        closeItOverlay();
+      });
+    });
+  }
+  itInput.addEventListener('input', () => renderItGrid(itInput.value));
+  itClose.addEventListener('click', closeItOverlay);
+  itOverlay.addEventListener('click', e => { if (e.target === itOverlay) closeItOverlay(); });
+  itClear.addEventListener('click', () => {
+    if (activeItSlot === null) return;
+    itemState[activeItSlot] = null;
+    renderSlot(activeItSlot);
+    closeItOverlay();
+  });
+
+  // ===== 全クリアボタン =====
+  document.getElementById('party-clear-btn').addEventListener('click', () => {
+    for (let i = 0; i < 6; i++) {
+      partyState[i] = null;
+      itemState[i]  = null;
+      renderSlot(i);
+    }
+    saveCurrentSet();
+  });
+
+})();
+
+// ============================================================
+// アーカイブ機能
+// ============================================================
+(function() {
+  const ARCHIVE_KEY = 'myArchives';
+
+  function loadArchives() {
+    try { return JSON.parse(localStorage.getItem(ARCHIVE_KEY)) || []; }
+    catch { return []; }
+  }
+
+  function saveArchives(arr) {
+    localStorage.setItem(ARCHIVE_KEY, JSON.stringify(arr));
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('archive-toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2000);
+  }
+
+  // ===== アーカイブ保存 =====
+  document.getElementById('archive-save-btn').addEventListener('click', () => {
+    const memo = document.getElementById('archive-memo-input').value.trim();
+    const items = _getItemState();
+
+    const members = Array.from({ length: 6 }, (_, i) => {
+      const p = partyState[i];
+      const it = items[i];
+      if (!p) return null;
+      return {
+        rank: p.rank,
+        name: p.name,
+        slug: p.slug,
+        types: p.types,
+        itemName: it ? it.name : null,
+        itemSlug: it ? it.slug : null,
+        itemCategory: it ? it.category : null,
+      };
+    }).filter(Boolean);
+
+    if (members.length === 0) {
+      showToast('ポケモンが選ばれていません');
+      return;
+    }
+
+    const entry = {
+      id: Date.now(),
+      date: new Date().toLocaleString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }),
+      members,
+      memo,
+    };
+
+    const archives = loadArchives();
+    archives.unshift(entry);
+    saveArchives(archives);
+    document.getElementById('archive-memo-input').value = '';
+    showToast('アーカイブに保存しました');
+  });
+
+  // ===== モーダル描画 =====
+  function renderArchiveModal() {
+    const archives = loadArchives();
+    const body  = document.getElementById('archive-modal-body');
+    const count = document.getElementById('archive-count');
+    count.textContent = archives.length + '件';
+
+    if (archives.length === 0) {
+      body.innerHTML = '<div class="archive-empty">アーカイブはまだありません</div>';
+      return;
+    }
+
+    body.innerHTML = archives.map(function(entry, idx) {
+      const membersHtml = entry.members.map(function(m) {
+        const sprite = 'https://www.smogon.com/dex/media/sprites/xy/' + m.slug + '.gif';
+        const itemHtml = m.itemName ? '<span style="font-size:.65rem;color:var(--muted)"> (' + m.itemName + ')</span>' : '';
+        return '<div class="archive-member-chip"><img src="' + sprite + '" alt="' + m.name + '"><span>' + m.name + '</span>' + itemHtml + '</div>';
+      }).join('');
+
+      const safeMemo = entry.memo ? entry.memo.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
+      const memoHtml = safeMemo ? '<div class="archive-entry-memo">' + safeMemo + '</div>' : '';
+
+      return '<div class="archive-entry" data-idx="' + idx + '">' +
+        '<div class="archive-entry-header">' +
+          '<span class="archive-entry-date">' + entry.date + '</span>' +
+          '<div class="archive-entry-actions">' +
+            '<button class="archive-action-btn load" data-idx="' + idx + '">このセットをロード</button>' +
+            '<button class="archive-action-btn del" data-idx="' + idx + '">削除</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="archive-entry-members">' + membersHtml + '</div>' +
+        memoHtml +
+      '</div>';
+    }).join('');
+
+    // ロードボタン
+    body.querySelectorAll('.archive-action-btn.load').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        const archives2 = loadArchives();
+        const entry = archives2[parseInt(btn.dataset.idx)];
+        for (let i = 0; i < 6; i++) partyState[i] = null;
+        const newItems = new Array(6).fill(null);
+        entry.members.forEach(function(m, i) {
+          const p = POKEMON_LIST.find(function(x) { return x.rank === m.rank; });
+          if (p) partyState[i] = p;
+          if (m.itemSlug) newItems[i] = ITEM_LIST.find(function(x) { return x.slug === m.itemSlug; }) || null;
+        });
+        _setItemState(newItems);
+        _renderAllSlots();
+        saveCurrentSet();
+        document.getElementById('archive-memo-input').value = entry.memo || '';
+        closeModal();
+        showToast('ロードしました');
+      });
+    });
+
+    // 削除ボタン
+    body.querySelectorAll('.archive-action-btn.del').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        const archives2 = loadArchives();
+        archives2.splice(parseInt(btn.dataset.idx), 1);
+        saveArchives(archives2);
+        renderArchiveModal();
+      });
+    });
+  }
+
+  function openModal()  {
+    renderArchiveModal();
+    document.getElementById('archive-overlay').classList.add('show');
+  }
+  function closeModal() {
+    document.getElementById('archive-overlay').classList.remove('show');
+  }
+
+  document.getElementById('archive-open-btn').addEventListener('click', openModal);
+  document.getElementById('archive-modal-close').addEventListener('click', closeModal);
+  document.getElementById('archive-overlay').addEventListener('click', function(e) {
+    if (e.target === document.getElementById('archive-overlay')) closeModal();
+  });
+
+  document.getElementById('archive-delete-all-btn').addEventListener('click', function() {
+    if (!confirm('アーカイブをすべて削除しますか？')) return;
+    saveArchives([]);
+    renderArchiveModal();
+  });
+
+  document.getElementById('archive-download-btn').addEventListener('click', function() {
+    const data = localStorage.getItem('myArchives') || '[]';
+    const blob = new Blob([data], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'myArchives_' + new Date().toISOString().slice(0, 10) + '.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+})();
+
+// ============================================================
+// 初期化
+// ============================================================
+buildPinArea();
+renderSetTabs();
+loadSet(0);
+</script>
+</body>
+</html>
