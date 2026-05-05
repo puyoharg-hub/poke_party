@@ -767,6 +767,18 @@
     font-size: .58rem; color: var(--muted); text-align: center;
   }
 
+  /* 特性状態ドット（アイコン下部の小さいインジケーター） */
+  .ability-state-dot {
+    position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
+    width: 6px; height: 6px; border-radius: 50%;
+  }
+  .ability-state-dot.abil-on                 { background: var(--teal); }
+  .ability-state-dot.res-on                  { background: var(--amber); }
+  .ability-state-dot.abil-off:not(.res-off)  { background: linear-gradient(90deg, var(--muted) 50%, var(--amber) 50%); width: 10px; border-radius: 3px; }
+  .ability-state-dot.abil-on.res-on          { background: linear-gradient(90deg, var(--teal) 50%, var(--amber) 50%); width: 10px; border-radius: 3px; }
+  .ability-state-dot.abil-on.res-off         { background: linear-gradient(90deg, var(--teal) 50%, var(--muted) 50%); width: 10px; border-radius: 3px; }
+  .ability-state-dot.abil-off.res-off        { background: var(--muted); width: 10px; border-radius: 3px; }
+
   @media (max-width: 700px) {
     .controls { grid-template-columns: 1fr; }
     .container { padding: 1rem; }
@@ -800,6 +812,7 @@
     </div>
     <div class="modal-body">
       <p class="modal-desc">ポケモンをクリックで計算から除外。特性を持つポケモンはクリック後に特性のON/OFFも切り替えられます。</p>
+      <div id="disabled-ability-list" style="display:none;margin-bottom:.75rem;"></div>
       <input type="text" class="search-input-full" id="exclude-search" placeholder="ポケモン名・タイプで絞り込み...">
       <div class="exclude-list" id="exclude-list"></div>
     </div>
@@ -994,6 +1007,47 @@ const partyState   = { 0: null, 1: null, 2: null, 3: null, 4: null, 5: null };
 const DISPLAY_LIMIT = 200;
 
 // ============================================================
+// 各種設定の永続化（localStorage）
+// ============================================================
+const SETTINGS_KEY = 'checkerSettings';
+
+function saveSettings() {
+  const s = {
+    mode:             currentMode,
+    excludedRanks:    Array.from(excludedRanks),
+    sortTypes:        sortTypes,
+    requiredTypes:    requiredTypes,
+    disabledAbilities: Array.from(disabledAbilities),
+    disabledResists:   Array.from(disabledResists),
+    pinState:         { 0: pinState[0], 1: pinState[1] },
+    checkerRanks:     [0,1,2].map(i => checkerState[i] ? checkerState[i].rank : null),
+    activePage:       document.querySelector('.page-tab.active')?.dataset.page || 'search',
+  };
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+}
+
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SETTINGS_KEY));
+    if (!s) return;
+    if (s.mode)              currentMode = s.mode;
+    if (s.excludedRanks)     excludedRanks = new Set(s.excludedRanks);
+    if (s.sortTypes)         sortTypes = s.sortTypes;
+    if (s.requiredTypes)     requiredTypes = s.requiredTypes;
+    if (s.disabledAbilities) disabledAbilities = new Set(s.disabledAbilities);
+    if (s.disabledResists)   disabledResists   = new Set(s.disabledResists);
+    if (s.pinState)          { pinState[0] = s.pinState[0] ?? null; pinState[1] = s.pinState[1] ?? null; }
+    if (s.checkerRanks)      s.checkerRanks.forEach((r, i) => {
+      checkerState[i] = r !== null ? (POKEMON_LIST.find(p => p.rank === r) || null) : null;
+    });
+    if (s.activePage)        window._restoreActivePage = s.activePage;
+  } catch(e) {}
+}
+
+// 初期ロード
+loadSettings();
+
+// ============================================================
 // マイセット (localStorage)
 // ============================================================
 const SET_COUNT = 5;
@@ -1071,6 +1125,7 @@ document.querySelectorAll('.page-tab').forEach(btn => {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('page-' + btn.dataset.page).classList.add('active');
+    saveSettings();
   });
 });
 
@@ -1171,9 +1226,12 @@ document.querySelectorAll('.tab').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
+    const prev = currentMode;
     currentMode = btn.dataset.mode;
-    pinState[0] = null; pinState[1] = null;
+    // pairに戻るとき固定2をクリア
+    if (currentMode === 'pair') pinState[1] = null;
     buildPinArea();
+    saveSettings();
   });
 });
 
@@ -1187,14 +1245,19 @@ function buildPinArea() {
     const row = document.createElement('div');
     row.className = 'pin-row';
     const sw = createSearchInput({
-      onSelect: p => { pinState[i] = p.rank; },
-      onClear:  () => { pinState[i] = null; },
+      onSelect: p => { pinState[i] = p.rank; saveSettings(); },
+      onClear:  () => { pinState[i] = null; saveSettings(); },
     });
+    // pinState復元
+    if (pinState[i] !== null) {
+      const p = POKEMON_LIST.find(x => x.rank === pinState[i]);
+      if (p) sw.setByRank(p.rank);
+    }
     const clearBtn = document.createElement('button');
     clearBtn.className = 'pin-clear';
     clearBtn.title = 'クリア';
     clearBtn.textContent = '✕';
-    clearBtn.addEventListener('click', () => { sw.clear(); pinState[i] = null; });
+    clearBtn.addEventListener('click', () => { sw.clear(); pinState[i] = null; saveSettings(); });
     const badge = document.createElement('span');
     badge.className = 'pin-badge';
     badge.textContent = i === 0 ? '固定1' : '固定2';
@@ -1231,6 +1294,7 @@ initCollapsible('sort-header', 'sort-body', 'sort-toggle');
       if (idx === -1) { requiredTypes.push(t); btn.classList.add('active-teal'); }
       else { requiredTypes.splice(idx, 1); btn.classList.remove('active-teal'); }
       updateHint('req-hint', requiredTypes, '必須');
+      saveSettings();
     });
     grid.appendChild(btn);
   });
@@ -1238,6 +1302,7 @@ initCollapsible('sort-header', 'sort-body', 'sort-toggle');
     requiredTypes = [];
     grid.querySelectorAll('.type-toggle-btn').forEach(b => b.classList.remove('active-teal'));
     updateHint('req-hint', requiredTypes, '必須');
+    saveSettings();
   });
 })();
 
@@ -1255,6 +1320,7 @@ initCollapsible('sort-header', 'sort-body', 'sort-toggle');
       else { sortTypes.splice(idx, 1); btn.classList.remove('active-amber'); }
       updateHint('sort-hint', sortTypes, '優先');
       if (allResults.length > 0) renderResults();
+      saveSettings();
     });
     grid.appendChild(btn);
   });
@@ -1263,6 +1329,7 @@ initCollapsible('sort-header', 'sort-body', 'sort-toggle');
     grid.querySelectorAll('.type-toggle-btn').forEach(b => b.classList.remove('active-amber'));
     updateHint('sort-hint', sortTypes, '優先');
     if (allResults.length > 0) renderResults();
+    saveSettings();
   });
 })();
 
@@ -1408,9 +1475,9 @@ function resetResults() {
   const badge     = document.getElementById('exclude-badge');
   const popup     = document.getElementById('ability-popup');
 
-  hamburger.addEventListener('click', () => { overlay.classList.add('show'); searchEl.focus(); });
-  closeBtn.addEventListener('click',  () => { overlay.classList.remove('show'); popup.classList.remove('show'); });
-  overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.classList.remove('show'); popup.classList.remove('show'); } });
+  hamburger.addEventListener('click', () => { overlay.classList.add('show'); document.body.style.overflow = 'hidden'; searchEl.focus(); });
+  closeBtn.addEventListener('click',  () => { overlay.classList.remove('show'); document.body.style.overflow = ''; popup.classList.remove('show'); });
+  overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.classList.remove('show'); document.body.style.overflow = ''; popup.classList.remove('show'); } });
   document.addEventListener('click', e => {
     if (!popup.contains(e.target) && !e.target.closest('.exclude-chip')) popup.classList.remove('show');
   });
@@ -1469,6 +1536,8 @@ function resetResults() {
         const tag = immuneChk.closest('.ability-option').querySelector('.ability-tag');
         tag.classList.toggle('active', immuneChk.checked);
         render(searchEl.value);
+        renderDisabledList();
+        saveSettings();
       });
     }
     const resistChk = popup.querySelector('.ability-resist-chk');
@@ -1479,6 +1548,8 @@ function resetResults() {
         const tag = resistChk.closest('.ability-option').querySelector('.ability-tag');
         tag.classList.toggle('active', resistChk.checked);
         render(searchEl.value);
+        renderDisabledList();
+        saveSettings();
       });
     }
 
@@ -1487,6 +1558,36 @@ function resetResults() {
     popup.style.top  = (rect.bottom + 6 + window.scrollY) + 'px';
     popup.style.left = Math.min(rect.left, window.innerWidth - 200) + 'px';
     popup.classList.add('show');
+  }
+
+  function renderDisabledList() {
+    const el = document.getElementById('disabled-ability-list');
+    const items = POKEMON_LIST.filter(p =>
+      disabledAbilities.has(p.rank) || disabledResists.has(p.rank)
+    );
+    if (items.length === 0) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.style.display = 'block';
+    const chips = items.map(p => {
+      const abilOff = disabledAbilities.has(p.rank);
+      const resOff  = disabledResists.has(p.rank);
+      const tags = [];
+      if (abilOff) tags.push(`<span style="color:var(--muted);font-size:.65rem">無効OFF</span>`);
+      if (resOff)  tags.push(`<span style="color:var(--muted);font-size:.65rem">半減OFF</span>`);
+      return `<div class="disabled-chip" data-rank="${p.rank}" title="${p.name}">
+        <img src="${SPRITE_URL(p.slug)}" alt="${p.name}" style="width:32px;height:32px;image-rendering:pixelated">
+        <div style="font-size:.65rem;color:var(--text);line-height:1.2">${p.name}</div>
+        <div style="display:flex;gap:.2rem">${tags.join('')}</div>
+      </div>`;
+    }).join('');
+    el.innerHTML = `<div style="font-size:.72rem;color:var(--accent2);font-weight:600;margin-bottom:.4rem">特性OFF中のポケモン</div>
+      <div style="display:flex;flex-wrap:wrap;gap:.4rem">${chips}</div>`;
+    el.querySelectorAll('.disabled-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const r = parseFloat(chip.dataset.rank);
+        const p = POKEMON_LIST.find(x => x.rank === r);
+        openAbilityPopup(chip, p);
+      });
+    });
   }
 
   function render(q = '') {
@@ -1502,9 +1603,9 @@ function resetResults() {
       let badge = '';
       if (hasAbil || hasRes) {
         const parts = [];
-        if (hasAbil) parts.push(`<span style="color:${abilOff ? 'var(--muted)' : 'var(--teal)'}">無効${abilOff ? 'OFF' : 'ON'}</span>`);
-        if (hasRes)  parts.push(`<span style="color:${resOff  ? 'var(--muted)' : 'var(--amber)'}">半減${resOff  ? 'OFF' : 'ON'}</span>`);
-        badge = `<div style="position:absolute;bottom:2px;left:0;right:0;text-align:center;font-size:.5rem;font-family:'JetBrains Mono',monospace;line-height:1.2;">${parts.join('<br>')}</div>`;
+        if (hasAbil) parts.push(abilOff ? 'abil-off' : 'abil-on');
+        if (hasRes)  parts.push(resOff  ? 'res-off'  : 'res-on');
+        badge = `<div class="ability-state-dot ${parts.join(' ')}"></div>`;
       }
       return `<div class="exclude-chip${ex ? ' excluded' : ''}" data-rank="${p.rank}" title="${p.name}">
         <img src="${SPRITE_URL(p.slug)}" alt="${p.name}" loading="lazy">
@@ -1520,7 +1621,7 @@ function resetResults() {
           openAbilityPopup(chip, p);
         } else {
           excludedRanks.has(r) ? excludedRanks.delete(r) : excludedRanks.add(r);
-          updateCount(); render(searchEl.value);
+          updateCount(); render(searchEl.value); saveSettings();
         }
       });
       // 右クリックで除外トグル（特性持ちでも除外操作できるように）
@@ -1528,9 +1629,10 @@ function resetResults() {
         e.preventDefault();
         const r = parseFloat(chip.dataset.rank);
         excludedRanks.has(r) ? excludedRanks.delete(r) : excludedRanks.add(r);
-        updateCount(); render(searchEl.value);
+        updateCount(); render(searchEl.value); saveSettings();
       });
     });
+    renderDisabledList();
   }
 
   function updateCount() {
@@ -1547,7 +1649,7 @@ function resetResults() {
 
   searchEl.addEventListener('input', () => render(searchEl.value));
   document.getElementById('exclude-clear-btn').addEventListener('click', () => {
-    excludedRanks.clear(); updateCount(); render(searchEl.value);
+    excludedRanks.clear(); updateCount(); render(searchEl.value); saveSettings();
   });
   render();
 })();
@@ -1565,12 +1667,14 @@ function resetResults() {
     lbl.textContent = labels[i];
     const clrBtn = document.createElement('button');
     clrBtn.className = 'slot-clear-btn'; clrBtn.textContent = '✕';
-    clrBtn.addEventListener('click', () => { sw.clear(); checkerState[i] = null; updateCheckerResult(); });
+    clrBtn.addEventListener('click', () => { sw.clear(); checkerState[i] = null; updateCheckerResult(); saveSettings(); });
     lbl.appendChild(clrBtn);
     const sw = createSearchInput({
-      onSelect: p => { checkerState[i] = p; updateCheckerResult(); },
-      onClear:  () => { checkerState[i] = null; updateCheckerResult(); },
+      onSelect: p => { checkerState[i] = p; updateCheckerResult(); saveSettings(); },
+      onClear:  () => { checkerState[i] = null; updateCheckerResult(); saveSettings(); },
     });
+    // checkerState復元
+    if (checkerState[i]) sw.setByRank(checkerState[i].rank);
     slot.appendChild(lbl); slot.appendChild(sw);
     slotsEl.appendChild(slot);
   }
@@ -1749,11 +1853,13 @@ function updateCheckerResult() {
     pkTitle.textContent = `スロット ${i + 1}`;
     pkInput.value = '';
     pkOverlay.classList.add('show');
+    document.body.style.overflow = 'hidden';
     renderPkGrid('');
     pkInput.focus();
   }
   function closePkOverlay() {
     pkOverlay.classList.remove('show');
+    document.body.style.overflow = '';
     activePkSlot = null;
   }
   function renderPkGrid(q) {
@@ -1794,11 +1900,13 @@ function updateCheckerResult() {
     itTitle.textContent = `スロット ${i + 1} — 道具`;
     itInput.value = '';
     itOverlay.classList.add('show');
+    document.body.style.overflow = 'hidden';
     renderItGrid('');
     itInput.focus();
   }
   function closeItOverlay() {
     itOverlay.classList.remove('show');
+    document.body.style.overflow = '';
     activeItSlot = null;
   }
   function renderItGrid(q) {
@@ -1991,9 +2099,11 @@ function updateCheckerResult() {
   function openModal()  {
     renderArchiveModal();
     document.getElementById('archive-overlay').classList.add('show');
+    document.body.style.overflow = 'hidden';
   }
   function closeModal() {
     document.getElementById('archive-overlay').classList.remove('show');
+    document.body.style.overflow = '';
   }
 
   document.getElementById('archive-open-btn').addEventListener('click', openModal);
@@ -2022,9 +2132,52 @@ function updateCheckerResult() {
 // ============================================================
 // 初期化
 // ============================================================
+
+// --- モード復元 ---
+if (currentMode === 'trio') {
+  document.querySelectorAll('.tab').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === 'trio');
+  });
+}
+
+// --- タイプボタン復元 ---
+document.querySelectorAll('#req-type-grid .type-toggle-btn').forEach(b => {
+  if (requiredTypes.includes(b.textContent)) b.classList.add('active-teal');
+});
+updateHint('req-hint', requiredTypes, '必須');
+
+document.querySelectorAll('#sort-type-grid .type-toggle-btn').forEach(b => {
+  if (sortTypes.includes(b.textContent)) b.classList.add('active-amber');
+});
+updateHint('sort-hint', sortTypes, '優先');
+
+// --- アクティブページ復元 ---
+if (window._restoreActivePage && window._restoreActivePage !== 'search') {
+  const page = window._restoreActivePage;
+  document.querySelectorAll('.page-tab').forEach(b => b.classList.toggle('active', b.dataset.page === page));
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + page));
+}
+
 buildPinArea();
 renderSetTabs();
 loadSet(0);
+
+// --- 除外バッジ復元 ---
+(function() {
+  const badge = document.getElementById('exclude-badge');
+  if (excludedRanks.size > 0) {
+    badge.textContent = excludedRanks.size;
+    badge.style.display = 'flex';
+  }
+  const countEl = document.getElementById('exclude-count');
+  if (countEl) {
+    countEl.textContent = `${excludedRanks.size}匹 除外中`;
+    countEl.classList.toggle('active', excludedRanks.size > 0);
+  }
+})();
+
+// --- checkerResult復元 ---
+updateCheckerResult();
 </script>
 </body>
 </html>
