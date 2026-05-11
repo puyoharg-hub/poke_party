@@ -787,6 +787,220 @@
     .party-grid { grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); }
     .party-grid-item img { width: 44px; height: 44px; }
   }
+
+  /* ===== IMPORT PAGE ===== */
+  .import-drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 14px;
+    padding: 2.5rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    background: var(--bg2);
+    margin-bottom: 1.25rem;
+  }
+  .import-drop-zone:hover, .import-drop-zone.drag-over {
+    border-color: var(--accent);
+    background: #1e253588;
+  }
+  .import-drop-zone .drop-icon { font-size: 2rem; margin-bottom: .6rem; }
+  .import-drop-zone .drop-label { font-size: .9rem; font-weight: 500; }
+  .import-drop-zone .drop-sub { font-size: .72rem; color: var(--muted); margin-top: .3rem; }
+
+  .import-toolbar {
+    display: none;
+    align-items: center;
+    gap: .6rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+  }
+  .import-toolbar.show { display: flex; }
+  .import-stat {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .72rem;
+    color: var(--muted);
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: .25rem .6rem;
+  }
+  .import-stat span { color: var(--accent2); font-weight: 600; }
+  .import-toolbar-right { margin-left: auto; display: flex; gap: .5rem; }
+
+  .import-search {
+    width: 100%;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: .45rem .8rem;
+    color: var(--text);
+    font-size: .85rem;
+    font-family: 'Noto Sans JP', sans-serif;
+    outline: none;
+    transition: border-color .15s;
+    margin-bottom: 1rem;
+    display: none;
+  }
+  .import-search.show { display: block; }
+  .import-search:focus { border-color: var(--accent); }
+  .import-search::placeholder { color: var(--muted); }
+
+  .import-entry-list { display: flex; flex-direction: column; gap: .65rem; }
+
+  .import-entry {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    padding: .875rem 1.125rem;
+  }
+  .import-entry-header {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin-bottom: .65rem;
+  }
+  .import-entry-date {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .7rem;
+    color: var(--muted);
+  }
+  .import-entry-src {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .62rem;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: .1rem .35rem;
+    color: var(--muted);
+  }
+  .import-members {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+    margin-bottom: .5rem;
+  }
+  .import-chip {
+    display: flex;
+    align-items: center;
+    gap: .25rem;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: .2rem .45rem .2rem .25rem;
+    font-size: .76rem;
+  }
+  .import-chip img {
+    width: 26px; height: 26px;
+    image-rendering: pixelated;
+    flex-shrink: 0;
+  }
+  .import-chip-item { font-size: .62rem; color: var(--muted); }
+  .import-entry-memo {
+    font-size: .76rem;
+    color: var(--muted);
+    line-height: 1.55;
+    padding: .45rem .65rem;
+    background: var(--bg3);
+    border-radius: 6px;
+    border-left: 2px solid var(--accent);
+    white-space: pre-wrap;
+  }
+  .import-empty {
+    text-align: center;
+    padding: 3rem 2rem;
+    color: var(--muted);
+    font-size: .875rem;
+  }
+  .import-apply-bar {
+    position: sticky;
+    bottom: calc(var(--footer-h) + .75rem);
+    z-index: 40;
+    display: none;
+    align-items: center;
+    gap: .75rem;
+    background: var(--bg2);
+    border: 1px solid var(--accent);
+    border-radius: 11px;
+    padding: .65rem 1.125rem;
+    margin-top: 1rem;
+    box-shadow: 0 6px 24px #00000077;
+  }
+  .import-apply-bar.show { display: flex; }
+  .import-apply-info { font-size: .8rem; color: var(--muted); flex: 1; }
+  .import-apply-info span { color: var(--accent2); font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+  .import-btn {
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: .78rem;
+    padding: .35rem .85rem;
+    border-radius: 7px;
+    border: 1px solid var(--border);
+    background: var(--bg3);
+    color: var(--text);
+    cursor: pointer;
+    transition: border-color .15s, color .15s, background .15s;
+  }
+  .import-btn:hover { border-color: var(--accent); color: var(--accent2); }
+  .import-btn.primary { border-color: var(--accent); color: var(--accent2); }
+  .import-btn.primary:hover { background: var(--accent); color: #fff; }
+  .import-btn.danger:hover { border-color: var(--red); color: var(--red); }
+
+  /* スロット選択ポップアップ */
+  .slot-picker-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: #00000077;
+    z-index: 300;
+    align-items: center; justify-content: center;
+  }
+  .slot-picker-overlay.show { display: flex; }
+  .slot-picker {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.25rem 1.5rem;
+    box-shadow: 0 16px 48px #000000aa;
+    min-width: 260px;
+  }
+  .slot-picker-title {
+    font-size: .82rem;
+    color: var(--muted);
+    margin-bottom: 1rem;
+    text-align: center;
+  }
+  .slot-picker-btns {
+    display: flex;
+    gap: .5rem;
+    justify-content: center;
+    margin-bottom: .75rem;
+  }
+  .slot-pick-btn {
+    width: 44px; height: 44px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: var(--bg3);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color .15s, background .15s, color .15s;
+  }
+  .slot-pick-btn:hover { border-color: var(--accent); color: var(--accent2); background: #1e2535; }
+  .slot-pick-btn.has-data { border-color: var(--accent); color: var(--accent2); }
+  .slot-picker-cancel {
+    display: block;
+    width: 100%;
+    padding: .35rem;
+    border-radius: 7px;
+    border: 1px solid var(--border);
+    background: none;
+    color: var(--muted);
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: .78rem;
+    cursor: pointer;
+    transition: color .15s, border-color .15s;
+  }
+  .slot-picker-cancel:hover { color: var(--red); border-color: #ef444466; }
 </style>
 </head>
 <body>
@@ -829,6 +1043,7 @@
   <div class="page-tabs">
     <button class="page-tab active" data-page="search">補完を探す</button>
     <button class="page-tab" data-page="checker">カバー・穴チェック</button>
+    <button class="page-tab" data-page="import">アーカイブ管理</button>
   </div>
 
   <!-- PAGE: 補完を探す -->
@@ -898,6 +1113,56 @@
       <div class="checker-slots" id="checker-slots"></div>
       <div class="checker-result" id="checker-result">
         <div class="empty" style="padding:1.5rem">ポケモンを1匹以上選んでください</div>
+      </div>
+    </div>
+  </div>
+
+<!-- ===== SLOT PICKER ===== -->
+<div class="slot-picker-overlay" id="slot-picker-overlay">
+  <div class="slot-picker">
+    <div class="slot-picker-title">どのセットに読み込みますか？</div>
+    <div class="slot-picker-btns" id="slot-picker-btns"></div>
+    <button class="slot-picker-cancel" id="slot-picker-cancel">キャンセル</button>
+  </div>
+</div>
+
+  <!-- PAGE: アーカイブ管理 -->
+  <div class="page" id="page-import">
+    <div class="section-panel">
+      <h2>アーカイブ管理</h2>
+      <p>JSONファイルを読み込んで内容を確認し、フッターのアーカイブに追加できます。</p>
+
+      <!-- ドロップゾーン -->
+      <div class="import-drop-zone" id="import-drop-zone">
+        <div class="drop-icon">📂</div>
+        <div class="drop-label">JSONファイルをドロップ、またはクリックして選択</div>
+        <div class="drop-sub">複数ファイル同時に読み込めます（myArchives_*.json）</div>
+        <input type="file" id="import-file-input" accept=".json" multiple style="display:none">
+      </div>
+
+      <!-- ツールバー -->
+      <div class="import-toolbar" id="import-toolbar">
+        <div class="import-stat">読込 <span id="import-stat-total">0</span>件</div>
+        <div class="import-stat">ファイル <span id="import-stat-files">0</span>個</div>
+        <div class="import-toolbar-right">
+          <button class="import-btn danger" id="import-btn-clear">クリア</button>
+          <button class="import-btn" id="import-btn-download">JSONダウンロード</button>
+        </div>
+      </div>
+
+      <!-- 検索 -->
+      <input type="text" class="import-search" id="import-search" placeholder="ポケモン名・メモで絞り込み…">
+
+      <!-- 一覧 -->
+      <div class="import-entry-list" id="import-entry-list">
+        <div class="import-empty">JSONファイルを読み込むと一覧が表示されます</div>
+      </div>
+
+      <!-- 反映バー -->
+      <div class="import-apply-bar" id="import-apply-bar">
+        <div class="import-apply-info"><span id="import-apply-count">0</span>件 をフッターのアーカイブに追加します</div>
+        <button class="import-btn danger" id="import-btn-clear2">クリア</button>
+        <button class="import-btn primary" id="import-btn-apply">アーカイブに反映</button>
       </div>
     </div>
   </div>
@@ -2127,6 +2392,212 @@ function updateCheckerResult() {
     a.click();
     URL.revokeObjectURL(a.href);
   });
+
+  // ============================================================
+  // アーカイブ管理タブ（インポート）
+  // ============================================================
+  (function() {
+    let importedEntries = []; // { ...entry, _source }
+    let importFileCount = 0;
+
+    const dropZone   = document.getElementById('import-drop-zone');
+    const fileInput  = document.getElementById('import-file-input');
+    const toolbar    = document.getElementById('import-toolbar');
+    const searchEl   = document.getElementById('import-search');
+    const listEl     = document.getElementById('import-entry-list');
+    const applyBar   = document.getElementById('import-apply-bar');
+    const applyCount = document.getElementById('import-apply-count');
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      loadFiles([...e.dataTransfer.files]);
+    });
+    fileInput.addEventListener('change', () => {
+      loadFiles([...fileInput.files]);
+      fileInput.value = '';
+    });
+
+    function loadFiles(files) {
+      const jsonFiles = files.filter(f => f.name.endsWith('.json'));
+      if (!jsonFiles.length) return;
+      let done = 0;
+      jsonFiles.forEach(function(file) {
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+          try {
+            const data = JSON.parse(ev.target.result);
+            if (Array.isArray(data)) {
+              data.forEach(function(entry) {
+                importedEntries.push(Object.assign({}, entry, { _source: file.name }));
+              });
+              importFileCount++;
+            }
+          } catch(err) {
+            alert(file.name + ' の読み込みに失敗しました: ' + err.message);
+          }
+          done++;
+          if (done === jsonFiles.length) afterLoad();
+        };
+        reader.readAsText(file);
+      });
+    }
+
+    function afterLoad() {
+      importedEntries.sort(function(a, b) { return b.id - a.id; });
+      document.getElementById('import-stat-total').textContent = importedEntries.length;
+      document.getElementById('import-stat-files').textContent = importFileCount;
+      toolbar.classList.add('show');
+      searchEl.classList.add('show');
+      applyCount.textContent = importedEntries.length;
+      applyBar.classList.add('show');
+      render(importedEntries);
+      dropZone.querySelector('.drop-sub').textContent = '追加ファイルをドロップして追記できます';
+    }
+
+    function render(entries) {
+      if (!entries.length) {
+        listEl.innerHTML = '<div class="import-empty">一致するエントリーがありません</div>';
+        return;
+      }
+      listEl.innerHTML = entries.map(function(entry, idx) {
+        const membersHtml = entry.members.map(function(m) {
+          const sprite = 'https://www.smogon.com/dex/media/sprites/xy/' + m.slug + '.gif';
+          const item = m.itemName ? '<span class="import-chip-item">（' + esc(m.itemName) + '）</span>' : '';
+          return '<div class="import-chip"><img src="' + sprite + '" alt="' + esc(m.name) + '"><span>' + esc(m.name) + '</span>' + item + '</div>';
+        }).join('');
+        const memoHtml = entry.memo ? '<div class="import-entry-memo">' + esc(entry.memo) + '</div>' : '';
+        const srcHtml  = entry._source ? '<span class="import-entry-src">' + esc(entry._source) + '</span>' : '';
+        return '<div class="import-entry">' +
+          '<div class="import-entry-header"><span class="import-entry-date">' + esc(entry.date) + '</span>' + srcHtml +
+          '<button class="import-btn primary" style="margin-left:auto;font-size:.72rem;padding:.2rem .65rem" data-entry-idx="' + idx + '" data-action="load-slot">セットに読込</button>' +
+          '</div>' +
+          '<div class="import-members">' + membersHtml + '</div>' +
+          memoHtml +
+          '</div>';
+      }).join('');
+
+      // ロードボタンにイベント付与
+      listEl.querySelectorAll('[data-action="load-slot"]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          const idx = parseInt(btn.dataset.entryIdx);
+          // 現在表示中のエントリーを特定（検索フィルタ後の並び順に対応）
+          const q = searchEl.value.trim().toLowerCase();
+          const visible = q ? importedEntries.filter(function(e) {
+            return e.members.map(function(m) { return m.name; }).join(' ').includes(q)
+              || (e.memo || '').toLowerCase().includes(q);
+          }) : importedEntries;
+          openSlotPicker(visible[idx]);
+        });
+      });
+    }
+
+    function esc(s) {
+      return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // 検索
+    searchEl.addEventListener('input', function() {
+      const q = searchEl.value.trim().toLowerCase();
+      if (!q) { render(importedEntries); return; }
+      render(importedEntries.filter(function(e) {
+        return e.members.map(function(m) { return m.name; }).join(' ').includes(q)
+          || (e.memo || '').toLowerCase().includes(q);
+      }));
+    });
+
+    // スロットピッカー
+    let _pendingEntry = null;
+    function openSlotPicker(entry) {
+      _pendingEntry = entry;
+      const btnsEl = document.getElementById('slot-picker-btns');
+      btnsEl.innerHTML = '';
+      for (let i = 0; i < SET_COUNT; i++) {
+        const btn = document.createElement('button');
+        btn.className = 'slot-pick-btn' + (setHasData(i) ? ' has-data' : '');
+        btn.textContent = i + 1;
+        btn.addEventListener('click', function() {
+          applyEntryToSlot(_pendingEntry, i);
+          closeSlotPicker();
+        });
+        btnsEl.appendChild(btn);
+      }
+      document.getElementById('slot-picker-overlay').classList.add('show');
+    }
+    function closeSlotPicker() {
+      document.getElementById('slot-picker-overlay').classList.remove('show');
+      _pendingEntry = null;
+    }
+    document.getElementById('slot-picker-cancel').addEventListener('click', closeSlotPicker);
+    document.getElementById('slot-picker-overlay').addEventListener('click', function(e) {
+      if (e.target === document.getElementById('slot-picker-overlay')) closeSlotPicker();
+    });
+
+    function applyEntryToSlot(entry, slotIdx) {
+      // 指定スロットに書き込む
+      const sets = loadSetsRaw();
+      const newParty = Array(6).fill(null).map(function(_, i) {
+        const m = entry.members[i];
+        if (!m) return { pkRank: null, itemSlug: null };
+        return { pkRank: m.rank, itemSlug: m.itemSlug || null };
+      });
+      sets[slotIdx] = { party: newParty };
+      localStorage.setItem('mySets', JSON.stringify(sets));
+
+      // 現在のアクティブスロットなら即反映
+      if (slotIdx === currentSetIdx) {
+        loadSet(slotIdx);
+        renderSetTabs();
+      } else {
+        renderSetTabs();
+      }
+      showToast('セット' + (slotIdx + 1) + 'に読み込みました');
+    }
+
+    // クリア（2か所のボタン共通）
+    function doClear() {
+      if (importedEntries.length && !confirm('読み込んだデータをすべてクリアしますか？')) return;
+      importedEntries = [];
+      importFileCount = 0;
+      toolbar.classList.remove('show');
+      searchEl.classList.remove('show');
+      applyBar.classList.remove('show');
+      listEl.innerHTML = '<div class="import-empty">JSONファイルを読み込むと一覧が表示されます</div>';
+      dropZone.querySelector('.drop-sub').textContent = '複数ファイル同時に読み込めます（myArchives_*.json）';
+    }
+    document.getElementById('import-btn-clear').addEventListener('click', doClear);
+    document.getElementById('import-btn-clear2').addEventListener('click', doClear);
+
+    // ダウンロード
+    document.getElementById('import-btn-download').addEventListener('click', function() {
+      const clean = importedEntries.map(function(e) {
+        const o = Object.assign({}, e); delete o._source; return o;
+      });
+      const blob = new Blob([JSON.stringify(clean, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'myArchives_merged_' + new Date().toISOString().slice(0, 10) + '.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    // アーカイブに反映
+    document.getElementById('import-btn-apply').addEventListener('click', function() {
+      if (!importedEntries.length) return;
+      const existing = loadArchives();
+      const toAdd = importedEntries.map(function(e) {
+        const o = Object.assign({}, e); delete o._source; return o;
+      });
+      const merged = toAdd.concat(existing);
+      merged.sort(function(a, b) { return b.id - a.id; });
+      saveArchives(merged);
+      showToast(toAdd.length + '件をアーカイブに追加しました');
+      doClear();
+    });
+  })();
 })();
 
 // ============================================================
