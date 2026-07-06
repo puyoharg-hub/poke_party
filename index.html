@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>タイプ補完チェッカー — M-A</title>
+<title>タイプ補完チェッカー — M-B</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
 
@@ -1237,9 +1237,41 @@
 // ============================================================
 // スプライトURL
 // ============================================================
-// スプライトURL — Smogon XY sprites を使用
+// スプライトURL — 基本はSmogon XY sprites を使用
 // data.jsの各ポケモンに slug フィールドが入っているのでそのまま使う
 const SPRITE_URL = slug => `https://www.smogon.com/dex/media/sprites/xy/${slug}.gif`;
+
+// ===== 画像読み込み失敗時の自動フォールバック =====
+// Smogonにまだ画像が無い新規メガシンカ(Legends Z-A由来)向けに、
+// slugから PokeBeach 掲載の公式アートワークURL(200x200・統一サイズ)を機械的に推測する。
+// 例: "staraptor-mega" -> Mega-Staraptor-200x200.png
+//     "raichu-mega-x"  -> Mega-Raichu-X-200x200.png
+function fallbackArtworkUrl(slug) {
+  const parts = slug.split('-');
+  const megaIdx = parts.indexOf('mega');
+  if (megaIdx === -1) return null; // メガシンカでないslugは対象外
+  const base   = parts.slice(0, megaIdx);
+  const suffix = parts.slice(megaIdx + 1); // 'x' / 'y' などが入りうる
+  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+  let name = 'Mega-' + base.map(cap).join('-');
+  if (suffix.length) name += '-' + suffix.map(s => s.toUpperCase()).join('-');
+  return `https://www.pokebeach.com/news/2026/01/${name}-200x200.png`;
+}
+
+// <img>のonerrorから呼ぶ共通ハンドラ。Smogon失敗→PokeBeach推測URL→それでも失敗ならブラウザ標準の壊れ画像アイコンのまま放置
+function handleSpriteError(imgEl, slug) {
+  const stage = Number(imgEl.dataset.fallbackStage || '0');
+  if (stage === 0) {
+    const url = fallbackArtworkUrl(slug);
+    if (url) {
+      imgEl.dataset.fallbackStage = '1';
+      imgEl.src = url;
+      return;
+    }
+  }
+  imgEl.dataset.fallbackStage = '2';
+  imgEl.onerror = null; // これ以上は失敗しても何もしない（ブラウザ標準の壊れ画像アイコンのまま放置）
+}
 const POKESPRITE_BASE = 'https://raw.githubusercontent.com/msikma/pokesprite/master/items-outline';
 const ITEM_SPRITE_URL = (slug, category) => {
   switch (category) {
@@ -1839,7 +1871,7 @@ function resetResults() {
       if (abilOff) tags.push(`<span style="color:var(--muted);font-size:.65rem">無効OFF</span>`);
       if (resOff)  tags.push(`<span style="color:var(--muted);font-size:.65rem">半減OFF</span>`);
       return `<div class="disabled-chip" data-rank="${p.rank}" title="${p.name}">
-        <img src="${SPRITE_URL(p.slug)}" alt="${p.name}" style="width:32px;height:32px;image-rendering:pixelated">
+        <img src="${SPRITE_URL(p.slug)}" alt="${p.name}" style="width:32px;height:32px;image-rendering:pixelated" referrerpolicy="no-referrer" onerror="handleSpriteError(this,'${p.slug}')">
         <div style="font-size:.65rem;color:var(--text);line-height:1.2">${p.name}</div>
         <div style="display:flex;gap:.2rem">${tags.join('')}</div>
       </div>`;
@@ -1873,7 +1905,7 @@ function resetResults() {
         badge = `<div class="ability-state-dot ${parts.join(' ')}"></div>`;
       }
       return `<div class="exclude-chip${ex ? ' excluded' : ''}" data-rank="${p.rank}" title="${p.name}">
-        <img src="${SPRITE_URL(p.slug)}" alt="${p.name}" loading="lazy">
+        <img src="${SPRITE_URL(p.slug)}" alt="${p.name}" loading="lazy" referrerpolicy="no-referrer" onerror="handleSpriteError(this,'${p.slug}')">
         ${badge}
       </div>`;
     }).join('');
@@ -2076,6 +2108,8 @@ function updateCheckerResult() {
       const img = document.createElement('img');
       img.src = SPRITE_URL(p.slug);
       img.alt = p.name;
+      img.referrerPolicy = 'no-referrer';
+      img.onerror = () => handleSpriteError(img, p.slug);
       iconBtn.insertBefore(img, itemBtn);
       iconBtn.classList.add('filled');
       nameEl.textContent = p.name;
@@ -2134,7 +2168,7 @@ function updateCheckerResult() {
     pkGrid.innerHTML = items.map(p => {
       const sel = partyState[activePkSlot] && partyState[activePkSlot].rank === p.rank;
       return `<div class="party-grid-item${sel ? ' selected-item' : ''}" data-rank="${p.rank}">
-        <img src="${SPRITE_URL(p.slug)}" alt="${p.name}" loading="lazy">
+        <img src="${SPRITE_URL(p.slug)}" alt="${p.name}" loading="lazy" referrerpolicy="no-referrer" onerror="handleSpriteError(this,'${p.slug}')">
         <div class="pgname">${p.name}</div>
         <div class="pgtypes">${p.types.join('・')}</div>
       </div>`;
@@ -2308,9 +2342,9 @@ function updateCheckerResult() {
 
     body.innerHTML = archives.map(function(entry, idx) {
       const membersHtml = entry.members.map(function(m) {
-        const sprite = 'https://www.smogon.com/dex/media/sprites/xy/' + m.slug + '.gif';
+        const sprite = SPRITE_URL(m.slug);
         const itemHtml = m.itemName ? '<span style="font-size:.65rem;color:var(--muted)"> (' + m.itemName + ')</span>' : '';
-        return '<div class="archive-member-chip"><img src="' + sprite + '" alt="' + m.name + '"><span>' + m.name + '</span>' + itemHtml + '</div>';
+        return '<div class="archive-member-chip"><img src="' + sprite + '" alt="' + m.name + '" referrerpolicy="no-referrer" onerror="handleSpriteError(this,\'' + m.slug + '\')"><span>' + m.name + '</span>' + itemHtml + '</div>';
       }).join('');
 
       const safeMemo = entry.memo ? entry.memo.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
@@ -2465,9 +2499,9 @@ function updateCheckerResult() {
       }
       listEl.innerHTML = entries.map(function(entry, idx) {
         const membersHtml = entry.members.map(function(m) {
-          const sprite = 'https://www.smogon.com/dex/media/sprites/xy/' + m.slug + '.gif';
+          const sprite = SPRITE_URL(m.slug);
           const item = m.itemName ? '<span class="import-chip-item">（' + esc(m.itemName) + '）</span>' : '';
-          return '<div class="import-chip"><img src="' + sprite + '" alt="' + esc(m.name) + '"><span>' + esc(m.name) + '</span>' + item + '</div>';
+          return '<div class="import-chip"><img src="' + sprite + '" alt="' + esc(m.name) + '" referrerpolicy="no-referrer" onerror="handleSpriteError(this,\'' + m.slug + '\')"><span>' + esc(m.name) + '</span>' + item + '</div>';
         }).join('');
         const memoHtml = entry.memo ? '<div class="import-entry-memo">' + esc(entry.memo) + '</div>' : '';
         const srcHtml  = entry._source ? '<span class="import-entry-src">' + esc(entry._source) + '</span>' : '';
