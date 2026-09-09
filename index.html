@@ -1246,6 +1246,12 @@ const SPRITE_URL = slug => `https://www.smogon.com/dex/media/sprites/xy/${slug}.
 // slugから PokeBeach 掲載の公式アートワークURL(200x200・統一サイズ)を機械的に推測する。
 // 例: "staraptor-mega" -> Mega-Staraptor-200x200.png
 //     "raichu-mega-x"  -> Mega-Raichu-X-200x200.png
+// Smogon/PokeBeach どちらにも正しい画像が無い個別ケースの救済リスト
+// (slug をキーに、直接使える画像URLを指定。ハッシュ名など機械的に推測できないものだけここに追加)
+const ARTWORK_OVERRIDES = {
+  'garchomp-mega-z': 'https://archives.bulbagarden.net/media/upload/7/75/0445Garchomp-Mega_Z.png',
+};
+
 function fallbackArtworkUrl(slug) {
   const parts = slug.split('-');
   const megaIdx = parts.indexOf('mega');
@@ -1258,11 +1264,11 @@ function fallbackArtworkUrl(slug) {
   return `https://www.pokebeach.com/news/2026/01/${name}-200x200.png`;
 }
 
-// <img>のonerrorから呼ぶ共通ハンドラ。Smogon失敗→PokeBeach推測URL→それでも失敗ならブラウザ標準の壊れ画像アイコンのまま放置
+// <img>のonerrorから呼ぶ共通ハンドラ。Smogon失敗→個別救済リスト→PokeBeach推測URL→それでも失敗ならブラウザ標準の壊れ画像アイコンのまま放置
 function handleSpriteError(imgEl, slug) {
   const stage = Number(imgEl.dataset.fallbackStage || '0');
   if (stage === 0) {
-    const url = fallbackArtworkUrl(slug);
+    const url = ARTWORK_OVERRIDES[slug] || fallbackArtworkUrl(slug);
     if (url) {
       imgEl.dataset.fallbackStage = '1';
       imgEl.src = url;
